@@ -1,0 +1,975 @@
+"""
+Локальный UI для запросов к OpenAI: ключ только на сервере, не в браузере.
+Загружает OPENAI_API_KEY из openai-local-chat/.env или из родительского .env репозитория.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import os
+import re
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+import store
+
+import httpx
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from openai import (
+    APIConnectionError,
+    APIStatusError,
+    APITimeoutError,
+    OpenAI,
+    RateLimitError,
+)
+from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+
+BASE_DIR = Path(__file__).resolve().parent
+REPO_ROOT = BASE_DIR.parent
+
+load_dotenv(REPO_ROOT / ".env")
+load_dotenv(BASE_DIR / ".env")
+
+_api_key = os.getenv("OPENAI_API_KEY")
+if not _api_key or not _api_key.strip():
+    raise RuntimeError(
+        "OPENAI_API_KEY не задан. Добавьте его в корневой .env репозитория или в openai-local-chat/.env"
+    )
+
+# Таймауты: Pro может считать очень долго; ошибки API — без лишних retry (честный ответ сразу).
+TIMEOUT_DEFAULT = httpx.Timeout(connect=30.0, read=1800.0, write=90.0, pool=60.0)
+TIMEOUT_PRO = httpx.Timeout(connect=60.0, read=7200.0, write=180.0, pool=120.0)
+PRO_READ_TIMEOUT_SEC = 7200
+
+client = OpenAI(
+    api_key=_api_key.strip(),
+    timeout=TIMEOUT_DEFAULT,
+    max_retries=0,
+)
+
+# Если /v1/models недоступен — показать типичные chat-модели (можно дописать вручную)
+DEFAULT_CHAT_MODEL = "gpt-4o-mini"
+CLASSIFIER_MODEL = DEFAULT_CHAT_MODEL
+
+# Авто-роутинг: приоритет моделей по ярусу (первая доступная в аккаунте).
+TIER_MODEL_PRIORITY: dict[str, list[str]] = {
+    "simple": [
+        "gpt-4o-mini",
+        "gpt-5.4-mini",
+        "gpt-4.1-mini",
+        "gpt-4o-mini-2024-07-18",
+    ],
+    "complex": [
+        "gpt-5.5",
+        "gpt-4o",
+        "gpt-5.4",
+        "gpt-4.1",
+        "gpt-4.1-mini",
+    ],
+    "reasoning": [
+        "gpt-5.5-pro",
+        "gpt-5.4-pro",
+        "o4-mini",
+        "o3-mini",
+        "gpt-5.5",
+        "gpt-4o",
+    ],
+}
+
+FALLBACK_CHAT_MODELS = [
+    "gpt-4o-mini",
+    "gpt-4o",
+    "gpt-5.4-mini",
+    "gpt-5.5",
+    "gpt-5.4",
+    "gpt-5.5-pro",
+    "gpt-5.4-pro",
+    "gpt-5.4-nano",
+    "gpt-4.1-mini",
+    "gpt-4.1",
+    "o4-mini",
+    "o3-mini",
+]
+
+MAX_CONTEXT_FILE_BYTES = 512 * 1024
+_ALLOWED_DOC_SUFFIXES = {".md", ".markdown", ".txt", ".text"}
+
+# Исключаем не-chat эндпоинты по id.
+# *-instruct → только v1/completions, не v1/chat/completions (иначе 404).
+_EXCLUDE = re.compile(
+    r"embed|whisper|tts|dall|moderation|realtime|transcribe|speech|audio|image|video|instruct-beta|-instruct",
+    re.I,
+)
+
+
+def _is_likely_chat_model(model_id: str) -> bool:
+    mid = model_id.lower()
+    if _EXCLUDE.search(mid):
+        return False
+    if mid.startswith("gpt-") or mid.startswith("o1") or mid.startswith("o3") or mid.startswith("o4"):
+        return True
+    if mid.startswith("chatgpt-"):
+        return True
+    return False
+
+
+def _validate_attachment(name: str | None, text: str | None) -> None:
+    if not text or not text.strip():
+        return
+    if not name or not name.strip():
+        raise HTTPException(status_code=400, detail="У приложенного файла нет имени.")
+    suffix = Path(name.strip()).suffix.lower()
+    if suffix not in _ALLOWED_DOC_SUFFIXES:
+        allowed = ", ".join(sorted(_ALLOWED_DOC_SUFFIXES))
+        raise HTTPException(
+            status_code=400,
+            detail=f"Формат «{suffix or '(без расширения)'}» не поддерживается. Допустимы: {allowed}.",
+        )
+    if len(text.encode("utf-8")) > MAX_CONTEXT_FILE_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Файл слишком большой (макс. {MAX_CONTEXT_FILE_BYTES // 1024} KB).",
+        )
+
+
+def _build_user_message(message: str, attachment_name: str | None, attachment_text: str | None) -> str:
+    msg = message.strip()
+    doc = (attachment_text or "").strip()
+    if not doc:
+        return msg
+    name = (attachment_name or "document").strip()
+    return (
+        f"Ниже приложен файл «{name}» для изучения.\n\n"
+        f"---\n{doc}\n---\n\n"
+        f"Запрос пользователя:\n{msg}"
+    )
+
+
+def _chat_body_for_api(body: ChatBody) -> ChatBody:
+    _validate_attachment(body.attachment_name, body.attachment_text)
+    merged = _build_user_message(body.message, body.attachment_name, body.attachment_text)
+    if merged == body.message.strip():
+        return body
+    return body.model_copy(
+        update={
+            "message": merged,
+            "attachment_name": None,
+            "attachment_text": None,
+        }
+    )
+
+
+def _is_pro_model(model_id: str) -> bool:
+    """gpt-*-pro, o1-pro, o3-pro — долгие запросы через Responses API."""
+    return _prefer_responses_api(model_id)
+
+
+def _timeout_for_model(model_id: str) -> httpx.Timeout:
+    return TIMEOUT_PRO if _is_pro_model(model_id) else TIMEOUT_DEFAULT
+
+
+def _openai_error_response(exc: Exception) -> HTTPException:
+    if isinstance(exc, HTTPException):
+        return exc
+    if isinstance(exc, APITimeoutError):
+        return HTTPException(
+            status_code=504,
+            detail={
+                "kind": "timeout",
+                "message": (
+                    f"Истекло время ожидания OpenAI (лимит read: "
+                    f"{PRO_READ_TIMEOUT_SEC // 3600} ч для Pro, "
+                    f"{int(TIMEOUT_DEFAULT.read)} с для остальных). "
+                    "Сократите запрос или повторите."
+                ),
+            },
+        )
+    if isinstance(exc, RateLimitError):
+        return HTTPException(
+            status_code=429,
+            detail={
+                "kind": "rate_limit",
+                "message": "Лимит запросов OpenAI (429). Подождите и повторите.",
+                "raw": exc.message,
+            },
+        )
+    if isinstance(exc, APIConnectionError):
+        return HTTPException(
+            status_code=502,
+            detail={
+                "kind": "connection",
+                "message": (
+                    "Не удалось завершить соединение с api.openai.com. "
+                    "Это не «нет интернета» — чаще обрыв на стороне OpenAI/прокси. "
+                    "Подождите 1–2 минуты и повторите."
+                ),
+                "raw": exc.message,
+            },
+        )
+    if isinstance(exc, APIStatusError):
+        status = exc.status_code
+        msg = _localize_error_text(exc.message)
+        kind = "api_error"
+        if status == 502:
+            msg = (
+                "OpenAI вернул 502 (Bad Gateway). Сервер перегружен или недоступен. "
+                "Подождите ~60 с и повторите."
+            )
+            kind = "bad_gateway"
+        elif status == 503:
+            msg = "OpenAI временно недоступен (503). Повторите через минуту."
+            kind = "unavailable"
+        elif status in (401, 403):
+            kind = "forbidden"
+        return HTTPException(
+            status_code=status if 400 <= status < 600 else 502,
+            detail={"kind": kind, "message": msg, "raw": exc.message},
+        )
+    raw = str(exc)
+    localized = _localize_error_text(raw)
+    return HTTPException(
+        status_code=500,
+        detail={"kind": "unknown", "message": localized, "raw": raw},
+    )
+
+
+def _looks_russian(text: str) -> bool:
+    letters = [c for c in text if c.isalpha()]
+    if not letters:
+        return False
+    cyr = sum(1 for c in letters if "\u0400" <= c <= "\u04FF")
+    return cyr / len(letters) >= 0.35
+
+
+def _localize_error_text(text: str) -> str:
+    """Переводит сообщения OpenAI и системные ошибки в понятный русский текст."""
+    if not text or not str(text).strip():
+        return "Произошла неизвестная ошибка. Повторите запрос."
+    raw = str(text).strip()
+    if _looks_russian(raw):
+        return raw
+
+    low = raw.lower()
+
+    def has(*parts: str) -> bool:
+        return all(p in low for p in parts)
+
+    def any_of(*parts: str) -> bool:
+        return any(p in low for p in parts)
+
+    if has("request too large", "tpm") or has("tokens per min", "limit"):
+        return (
+            "Запрос слишком большой для лимита токенов в минуту (TPM) вашей организации. "
+            "Сократите сообщение, уберите вложенный файл или выберите модель с меньшим расходом токенов."
+        )
+    if any_of("maximum context length", "context length exceeded", "context_length_exceeded"):
+        return (
+            "Сообщение не помещается в контекст выбранной модели. "
+            "Сократите текст, уменьшите файл или начните новый чат."
+        )
+    if any_of("incorrect api key", "invalid api key", "invalid_api_key", "api key provided"):
+        return (
+            "Неверный API-ключ OpenAI. Проверьте OPENAI_API_KEY в .env и перезапустите сервер."
+        )
+    if any_of("insufficient_quota", "exceeded your current quota", "billing_hard_limit"):
+        return (
+            "Закончился баланс или квота OpenAI. Проверьте биллинг на platform.openai.com."
+        )
+    if any_of("must be verified", "organization must be verified", "verified to use the model"):
+        return (
+            "Для этой модели нужна верификация организации в OpenAI. "
+            "Пройдите её в настройках аккаунта или выберите другую модель."
+        )
+    if any_of("does not have access to model", "model_not_found", "no such model") or (
+        "does not exist" in low and "model" in low
+    ):
+        m = re.search(r"model[`'\"]? ([^`'\"]+)", raw, re.I)
+        model_name = m.group(1) if m else "выбранная модель"
+        return f"Модель «{model_name}» недоступна вашему API-ключу. Выберите другую модель из списка."
+    if any_of("not a chat model", "not supported for chat", "v1/chat/completions"):
+        return (
+            "Эта модель не поддерживает обычный чат. Выберите другую модель (например gpt-4o-mini)."
+        )
+    if any_of("overloaded", "engine is currently overloaded", "server had an error"):
+        return (
+            "Серверы OpenAI перегружены. Подождите 30–60 секунд и отправьте запрос снова."
+        )
+    if any_of("content policy", "safety system", "flagged", "moderation"):
+        return (
+            "Запрос отклонён политикой безопасности OpenAI. Переформулируйте сообщение."
+        )
+    if any_of(
+        "connection error",
+        "failed to connect",
+        "connection refused",
+        "name or service not known",
+        "connection reset",
+        "remote end closed",
+        "broken pipe",
+    ):
+        return (
+            "Соединение с api.openai.com оборвалось до ответа. Это не «нет интернета» — чаще таймаут "
+            "или сбой на стороне OpenAI/Cloudflare. Подождите 1–2 минуты и повторите; для Pro попробуйте "
+            "gpt-5.5 без Pro или короче запрос."
+        )
+    if any_of("cloudflare", "origin_bad_gateway", "error 502: bad gateway"):
+        return (
+            "OpenAI временно недоступен (502 через Cloudflare). Подождите ~60 секунд и повторите запрос."
+        )
+    if any_of("unsupported_parameter", "max_completion_tokens", "max_tokens") and "not supported" in low:
+        return (
+            "Несовместимый параметр запроса для этой модели. Обновите страницу и повторите; "
+            "если не помогло — выберите gpt-4o-mini или gpt-5.5 без Pro."
+        )
+    if any_of("request timed out", "timed out", "timeout"):
+        return (
+            "Истекло время ожидания ответа OpenAI. Для Pro-моделей ответ может идти очень долго — "
+            "сократите запрос или повторите позже."
+        )
+    if any_of("rate limit", "429", "too many requests"):
+        return (
+            "Превышен лимит запросов OpenAI (слишком много обращений за короткое время). "
+            "Подождите минуту и повторите."
+        )
+    if any_of("bad gateway", "502"):
+        return (
+            "OpenAI временно недоступен (ошибка 502). Подождите около минуты и повторите запрос."
+        )
+    if any_of("service unavailable", "503"):
+        return "OpenAI временно недоступен (ошибка 503). Повторите через минуту."
+    if any_of("invalid image", "image format", "unsupported image", "invalid file"):
+        return (
+            "Файл изображения не подходит. Используйте PNG, JPEG или WebP в допустимом размере."
+        )
+    if any_of("string too long", "too large", "file is too big", "exceeds the maximum"):
+        return (
+            "Файл или запрос слишком большой для этой операции. Уменьшите размер и повторите."
+        )
+    if any_of("permission", "access denied", "forbidden", "403"):
+        return (
+            "Доступ к этой операции запрещён вашим API-ключом или организацией. "
+            "Проверьте права в аккаунте OpenAI."
+        )
+    if any_of("invalid_request", "invalid request"):
+        return (
+            "Некорректный запрос к OpenAI. Проверьте модель, вложения и параметры, затем повторите."
+        )
+    if any_of("internal server error", "500"):
+        return (
+            "Внутренняя ошибка на стороне OpenAI (500). Повторите запрос через минуту."
+        )
+    if any_of("ssl", "certificate"):
+        return (
+            "Ошибка защищённого соединения с OpenAI. Проверьте системное время и сетевые настройки."
+        )
+    if any_of("json", "decode", "parse"):
+        return (
+            "Сервер OpenAI вернул неожиданный ответ. Повторите запрос. "
+            "Если ошибка повторяется — выберите другую модель."
+        )
+
+    return (
+        "Не удалось выполнить запрос к OpenAI. "
+        "Попробуйте другую модель, сократите сообщение или повторите через минуту."
+    )
+
+
+def _normalize_error_detail(detail) -> dict:
+    """Приводит detail к словарю с русским message."""
+    if isinstance(detail, dict):
+        msg = detail.get("message")
+        if msg is not None:
+            detail = {**detail, "message": _localize_error_text(str(msg))}
+        return detail
+    if isinstance(detail, str):
+        return {"kind": "http", "message": _localize_error_text(detail)}
+    return {"kind": "unknown", "message": _localize_error_text(str(detail))}
+
+
+def _raise_openai_error(exc: Exception) -> None:
+    """Преобразует исключение в HTTPException с понятным русским текстом."""
+    if isinstance(exc, HTTPException):
+        raise HTTPException(status_code=exc.status_code, detail=_normalize_error_detail(exc.detail)) from exc
+    raise _openai_error_response(exc)
+
+
+def _prefer_responses_api(model_id: str) -> bool:
+    """
+    Часть моделей (gpt-5.*-pro, o*-pro и т.п.) не поддерживает v1/chat/completions —
+    только Responses API. Не трогаем *-instruct (там completions).
+    """
+    mid = model_id.lower()
+    if "-instruct" in mid:
+        return False
+    if "-pro" not in mid:
+        return False
+    if mid.startswith("gpt-") or mid.startswith("o1") or mid.startswith("o3"):
+        return True
+    return False
+
+
+REPLY_LANGUAGE_INSTRUCTIONS: dict[str, str] = {
+    "ru": (
+        "Всегда отвечай на русском языке. "
+        "Если пользователь явно просит другой язык — используй его."
+    ),
+    "en": (
+        "Always respond in English. "
+        "If the user explicitly asks for another language — use that language."
+    ),
+}
+
+
+class ChatBody(BaseModel):
+    model: str = Field(min_length=1)
+    message: str = Field(min_length=1)
+    system: str | None = None
+    reply_language: str = Field(default="ru")
+    routing_mode: str = Field(default="manual")
+    allow_pro: bool = Field(default=False)
+    attachment_name: str | None = None
+    attachment_text: str | None = None
+
+
+def _effective_system(body: ChatBody) -> str:
+    lang = (body.reply_language or "ru").strip().lower()
+    lang_inst = REPLY_LANGUAGE_INSTRUCTIONS.get(lang, REPLY_LANGUAGE_INSTRUCTIONS["ru"])
+    custom = (body.system or "").strip()
+    if custom:
+        return f"{lang_inst}\n\n{custom}"
+    return lang_inst
+
+
+def _body_for_openai(body: ChatBody) -> ChatBody:
+    return body.model_copy(update={"system": _effective_system(body)})
+
+
+def _text_from_responses(resp) -> str:
+    """Собираем текст из output_text или из items output (reasoning + message)."""
+    raw = (resp.output_text or "").strip()
+    if raw:
+        return raw
+    chunks: list[str] = []
+    for item in resp.output or []:
+        if getattr(item, "type", None) != "message":
+            continue
+        for part in getattr(item, "content", None) or []:
+            if getattr(part, "type", None) == "output_text":
+                chunks.append(getattr(part, "text", "") or "")
+    return "".join(chunks).strip()
+
+
+def _text_from_chat_message(msg) -> str:
+    """Нормализуем content (строка, None или редко список блоков в JSON)."""
+    c = msg.content
+    if c is None:
+        return ""
+    if isinstance(c, str):
+        return c
+    if isinstance(c, list):
+        parts: list[str] = []
+        for block in c:
+            if isinstance(block, dict):
+                if block.get("type") in ("text", "output_text"):
+                    parts.append(str(block.get("text") or ""))
+            else:
+                t = getattr(block, "text", None)
+                if t:
+                    parts.append(str(t))
+        return "".join(parts)
+    return str(c)
+
+
+def _responses_stream_api(kwargs: dict, timeout: httpx.Timeout) -> dict:
+    """Поток для Pro: соединение не «засыпает», ошибки приходят по событиям."""
+    text_parts: list[str] = []
+    with client.responses.stream(**kwargs, timeout=timeout) as stream:
+        for event in stream:
+            etype = getattr(event, "type", None)
+            if etype == "response.output_text.delta":
+                text_parts.append(getattr(event, "delta", "") or "")
+            elif etype == "error":
+                raw_msg = getattr(event, "message", "") or "Ошибка потока OpenAI."
+                raise HTTPException(
+                    status_code=502,
+                    detail={
+                        "kind": "stream_error",
+                        "message": _localize_error_text(str(raw_msg)),
+                        "code": getattr(event, "code", None),
+                    },
+                )
+            elif etype == "response.failed":
+                resp = getattr(event, "response", None)
+                err = getattr(resp, "error", None) if resp else None
+                err_msg = getattr(err, "message", None) if err else None
+                raise HTTPException(
+                    status_code=502,
+                    detail={
+                        "kind": "response_failed",
+                        "message": _localize_error_text(
+                            str(err_msg or "OpenAI не смог завершить ответ.")
+                        ),
+                    },
+                )
+            elif etype == "response.incomplete":
+                raise HTTPException(
+                    status_code=504,
+                    detail={
+                        "kind": "incomplete",
+                        "message": (
+                            "Ответ оборвался до завершения — Pro-модель не успела закончить за отведённое "
+                            "время или достигнут лимит. Сократите запрос и повторите."
+                        ),
+                    },
+                )
+        final = stream.get_final_response()
+
+    text = _text_from_responses(final) or "".join(text_parts).strip()
+    usage = final.usage.model_dump() if final.usage else None
+    if not text and final.status == "completed":
+        logger.warning(
+            "responses(stream): пустой текст при status=completed model=%s output=%s",
+            final.model,
+            json.dumps([getattr(x, "type", type(x).__name__) for x in (final.output or [])]),
+        )
+    return {
+        "reply": text,
+        "model": final.model,
+        "finish_reason": None,
+        "usage": usage,
+        "api": "responses",
+        "response_status": final.status,
+        "streamed": True,
+    }
+
+
+def _responses_api(body: ChatBody) -> dict:
+    """Модели вроде gpt-5.5-pro — только /v1/responses."""
+    model = body.model.strip()
+    pro = _is_pro_model(model)
+    timeout = _timeout_for_model(model)
+    kwargs: dict = {
+        "model": model,
+        "input": body.message.strip(),
+    }
+    if body.system and body.system.strip():
+        kwargs["instructions"] = body.system.strip()
+
+    if pro:
+        return _responses_stream_api(kwargs, timeout)
+
+    resp = client.responses.create(**kwargs, timeout=timeout)
+    text = _text_from_responses(resp)
+    usage = resp.usage.model_dump() if resp.usage else None
+    if not text and resp.status == "completed":
+        logger.warning(
+            "responses: пустой текст при status=completed model=%s output=%s",
+            resp.model,
+            json.dumps([getattr(x, "type", type(x).__name__) for x in (resp.output or [])]),
+        )
+    return {
+        "reply": text,
+        "model": resp.model,
+        "finish_reason": None,
+        "usage": usage,
+        "api": "responses",
+        "response_status": resp.status,
+        "streamed": False,
+    }
+
+
+def _completions_fallback(body: ChatBody) -> dict:
+    """Модели *-instruct и часть legacy — только completions API."""
+    if body.system and body.system.strip():
+        prompt = f"{body.system.strip()}\n\n{body.message.strip()}"
+    else:
+        prompt = body.message.strip()
+    resp = client.completions.create(
+        model=body.model.strip(),
+        prompt=prompt,
+        max_tokens=4096,
+        timeout=_timeout_for_model(body.model.strip()),
+    )
+    ch = resp.choices[0]
+    text = (ch.text or "").strip()
+    return {
+        "reply": text,
+        "model": resp.model,
+        "finish_reason": ch.finish_reason,
+        "usage": resp.usage.model_dump() if resp.usage else None,
+        "api": "completions",
+    }
+
+
+def _error_dict_from_exception(exc: Exception) -> dict:
+    if isinstance(exc, HTTPException):
+        return _normalize_error_detail(exc.detail)
+    http = _openai_error_response(exc)
+    return _normalize_error_detail(http.detail)
+
+
+def _pick_model_for_tier(tier: str, *, allow_pro: bool) -> str:
+    if tier == "reasoning" and not allow_pro:
+        tier = "complex"
+    candidates = TIER_MODEL_PRIORITY.get(tier) or TIER_MODEL_PRIORITY["simple"]
+    return candidates[0]
+
+
+def _parse_classifier_tier(raw: str) -> str:
+    low = (raw or "").strip().lower()
+    if "reason" in low:
+        return "reasoning"
+    if "simple" in low or low == "s":
+        return "simple"
+    if "complex" in low:
+        return "complex"
+    return "complex"
+
+
+def _classify_request_tier(body: ChatBody) -> dict:
+    """Дешёвый классификатор на mini: simple | complex | reasoning."""
+    if body.attachment_text and len(body.attachment_text.strip()) > 48_000:
+        return {"tier": "complex", "raw": "large_attachment", "source": "heuristic"}
+
+    preview = body.message.strip()[:3000]
+    attachment_note = ""
+    if body.attachment_name:
+        attachment_note = f"\n[Прикреплён файл: {body.attachment_name}]"
+
+    system = (
+        "Классифицируй сложность запроса. Ответь одним словом: simple, complex или reasoning.\n"
+        "simple — короткий вопрос, перевод, черновик, факт\n"
+        "complex — код, анализ, сравнение, структурированный ответ, разбор файла\n"
+        "reasoning — математика, доказательства, глубокий дебаг, архитектура, многошаговая логика"
+    )
+    try:
+        resp = client.chat.completions.create(
+            model=CLASSIFIER_MODEL,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": f"Запрос:\n{preview}{attachment_note}"},
+            ],
+            max_tokens=16,
+            temperature=0,
+            timeout=TIMEOUT_DEFAULT,
+        )
+        raw = (_text_from_chat_message(resp.choices[0].message) or "").strip()
+        return {"tier": _parse_classifier_tier(raw), "raw": raw, "source": "classifier"}
+    except Exception as exc:
+        logger.warning("classifier failed: %s", exc)
+        return {"tier": "complex", "raw": "classifier_failed", "source": "fallback"}
+
+
+def _resolve_routed_body(body: ChatBody) -> tuple[ChatBody, dict]:
+    """При routing_mode=auto подбирает модель по ярусу сложности."""
+    mode = (body.routing_mode or "manual").strip().lower()
+    meta: dict = {"routing_mode": mode}
+    if mode != "auto":
+        return body, meta
+
+    classified = _classify_request_tier(body)
+    tier = classified["tier"]
+    tier_downgraded = False
+    if tier == "reasoning" and not body.allow_pro:
+        tier = "complex"
+        tier_downgraded = True
+
+    model = _pick_model_for_tier(tier, allow_pro=body.allow_pro)
+    meta.update(
+        {
+            "routing_mode": "auto",
+            "routing_tier": tier,
+            "routing_classifier": classified.get("raw"),
+            "routing_classifier_source": classified.get("source"),
+            "routing_model_planned": model,
+        }
+    )
+    if tier_downgraded:
+        meta["routing_tier_downgraded"] = True
+
+    return body.model_copy(update={"model": model}), meta
+
+
+def _attach_routing_to_data(data: dict, routing_meta: dict, *, fallback: bool = False) -> None:
+    if routing_meta.get("routing_mode") != "auto":
+        return
+    data["routing_mode"] = "auto"
+    data["routing_tier"] = routing_meta.get("routing_tier")
+    data["routing_classifier"] = routing_meta.get("routing_classifier")
+    if routing_meta.get("routing_tier_downgraded"):
+        data["routing_tier_downgraded"] = True
+    if fallback:
+        data["routing_fallback"] = True
+
+
+def _execute_chat_with_routing(body: ChatBody) -> dict:
+    """Ручной режим или авто-роутинг с одним fallback simple → complex."""
+    exec_body, routing_meta = _resolve_routed_body(body)
+    outcome = _execute_chat_sync(exec_body)
+
+    if outcome.get("ok"):
+        _attach_routing_to_data(outcome["data"], routing_meta)
+        return outcome
+
+    if routing_meta.get("routing_tier") != "simple":
+        return outcome
+
+    err = outcome.get("error") or {}
+    kind = err.get("kind", "")
+    if kind not in ("timeout", "api_error", "unknown", "stream_error", "response_failed", "incomplete"):
+        return outcome
+
+    complex_model = _pick_model_for_tier("complex", allow_pro=False)
+    if complex_model == exec_body.model:
+        return outcome
+
+    logger.info("routing fallback simple → complex (%s)", complex_model)
+    retry = _execute_chat_sync(exec_body.model_copy(update={"model": complex_model}))
+    if retry.get("ok"):
+        routing_meta = {**routing_meta, "routing_tier": "complex", "routing_model_planned": complex_model}
+        _attach_routing_to_data(retry["data"], routing_meta, fallback=True)
+    return retry if retry.get("ok") else outcome
+
+
+def _execute_chat_sync(body: ChatBody) -> dict:
+    """Синхронный вызов OpenAI. Возвращает {ok, data?|error?}."""
+    model = body.model.strip()
+    try:
+        if _prefer_responses_api(model):
+            return {"ok": True, "data": _responses_api(body)}
+
+        messages: list[dict[str, str]] = []
+        if body.system and body.system.strip():
+            messages.append({"role": "system", "content": body.system.strip()})
+        messages.append({"role": "user", "content": body.message})
+
+        try:
+            resp = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                timeout=_timeout_for_model(model),
+            )
+        except Exception as e:
+            err = str(e).lower()
+            if "not a chat model" in err or "v1/completions" in err:
+                mid = model.lower()
+                if "-instruct" in mid:
+                    return {"ok": True, "data": _completions_fallback(body)}
+                try:
+                    return {"ok": True, "data": _responses_api(body)}
+                except Exception as e_resp:
+                    try:
+                        return {"ok": True, "data": _completions_fallback(body)}
+                    except Exception as e2:
+                        return {
+                            "ok": False,
+                            "error": {
+                                "kind": "routing_failed",
+                                "message": (
+                                    "Модель не поддерживает обычный чат, и альтернативные способы "
+                                    "запроса тоже не сработали. Выберите другую модель или сократите "
+                                    "сообщение."
+                                ),
+                            },
+                        }
+            raise
+
+        choice = resp.choices[0]
+        content = _text_from_chat_message(choice.message)
+        return {
+            "ok": True,
+            "data": {
+                "reply": content,
+                "model": resp.model,
+                "finish_reason": choice.finish_reason,
+                "usage": resp.usage.model_dump() if resp.usage else None,
+                "api": "chat.completions",
+            },
+        }
+    except HTTPException as exc:
+        return {"ok": False, "error": _error_dict_from_exception(exc)}
+    except Exception as exc:
+        return {"ok": False, "error": _error_dict_from_exception(exc)}
+
+
+_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="openai-job")
+
+
+def _run_assistant_job(assistant_message_id: str, request_payload: dict) -> None:
+    store.set_message_status(assistant_message_id, "running")
+    try:
+        body = _chat_body_for_api(_body_for_openai(ChatBody(**request_payload)))
+        outcome = _execute_chat_with_routing(body)
+        if outcome.get("ok"):
+            data = outcome["data"]
+            reply = str(data.get("reply") or "")
+            store.complete_assistant_message(assistant_message_id, reply=reply, result=data)
+        else:
+            store.fail_assistant_message(
+                assistant_message_id,
+                outcome.get("error") or {"kind": "unknown", "message": "Неизвестная ошибка."},
+            )
+    except HTTPException as exc:
+        store.fail_assistant_message(assistant_message_id, _error_dict_from_exception(exc))
+    except Exception as exc:
+        logger.exception("assistant job %s failed", assistant_message_id)
+        store.fail_assistant_message(assistant_message_id, _error_dict_from_exception(exc))
+
+
+def _schedule_assistant_job(assistant_message_id: str, request_payload: dict) -> None:
+    _executor.submit(_run_assistant_job, assistant_message_id, request_payload)
+
+
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    store.init_db()
+    for job in store.get_resumable_jobs():
+        _schedule_assistant_job(job["assistant_message_id"], job["request_payload"])
+    yield
+    _executor.shutdown(wait=False, cancel_futures=False)
+
+
+app = FastAPI(title="OpenAI Local Chat", lifespan=_lifespan)
+
+
+class SessionCreateBody(BaseModel):
+    title: str | None = None
+    system: str | None = None
+    model: str | None = None
+
+
+@app.get("/api/models")
+def api_models():
+    try:
+        listed = client.models.list()
+        ids = sorted({m.id for m in listed.data if _is_likely_chat_model(m.id)})
+        if not ids:
+            return {"models": FALLBACK_CHAT_MODELS, "source": "fallback_empty"}
+        return {"models": ids, "source": "openai"}
+    except Exception as e:
+        return {
+            "models": FALLBACK_CHAT_MODELS,
+            "source": "fallback_error",
+            "warning": _localize_error_text(str(e)),
+        }
+
+
+@app.post("/api/sessions")
+def api_create_session(body: SessionCreateBody = SessionCreateBody()):
+    session = store.create_session(
+        title=(body.title or "Новый чат").strip() or "Новый чат",
+        system=body.system,
+        model=body.model,
+    )
+    return {"session": session, "messages": []}
+
+
+@app.get("/api/sessions")
+def api_list_sessions(archived: bool = False):
+    return {"sessions": store.list_sessions(archived=archived)}
+
+
+@app.get("/api/sessions/archived/list")
+def api_list_archived_sessions():
+    return {"sessions": store.list_sessions(archived=True)}
+
+
+@app.post("/api/sessions/{session_id}/archive")
+def api_archive_session(session_id: str):
+    session = store.archive_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Сессия не найдена.")
+    return {"session": session}
+
+
+@app.delete("/api/sessions/{session_id}")
+def api_delete_session(session_id: str):
+    if not store.delete_session_permanently(session_id):
+        raise HTTPException(
+            status_code=400,
+            detail="Удалить можно только чат из архива.",
+        )
+    return {"ok": True, "id": session_id}
+
+
+@app.get("/api/sessions/{session_id}")
+def api_get_session(session_id: str):
+    session = store.get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Сессия не найдена.")
+    return {"session": session, "messages": store.get_messages(session_id)}
+
+
+@app.get("/api/messages/{message_id}")
+def api_get_message(message_id: str):
+    message = store.get_message(message_id)
+    if not message:
+        raise HTTPException(status_code=404, detail="Сообщение не найдено.")
+    return {"message": message}
+
+
+@app.post("/api/sessions/{session_id}/messages")
+def api_enqueue_message(session_id: str, body: ChatBody):
+    session = store.get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Сессия не найдена.")
+    if session.get("archived_at"):
+        raise HTTPException(status_code=400, detail="Чат в архиве — отправка сообщений недоступна.")
+
+    _validate_attachment(body.attachment_name, body.attachment_text)
+    payload = body.model_dump()
+    user_text = body.message.strip()
+
+    if not session.get("title") or session["title"] == "Новый чат":
+        title = user_text[:60] + ("…" if len(user_text) > 60 else "")
+        store.touch_session(session_id, title=title)
+
+    store.update_session_settings(session_id, system=body.system, model=body.model)
+
+    queued = store.enqueue_chat(
+        session_id,
+        user_content=user_text,
+        request_payload=payload,
+        attachment_name=body.attachment_name,
+    )
+    _schedule_assistant_job(queued["assistant_message_id"], payload)
+
+    return {
+        "session_id": session_id,
+        "user_message_id": queued["user_message_id"],
+        "assistant_message_id": queued["assistant_message_id"],
+        "status": queued["status"],
+        "background": True,
+    }
+
+
+@app.post("/api/chat")
+def api_chat(body: ChatBody):
+    """Синхронный путь (без фона). UI использует /api/sessions/.../messages."""
+    body = _chat_body_for_api(_body_for_openai(body))
+    outcome = _execute_chat_with_routing(body)
+    if outcome.get("ok"):
+        return outcome["data"]
+    err = outcome.get("error") or {"kind": "unknown", "message": "Неизвестная ошибка."}
+    kind = err.get("kind", "unknown")
+    status = 504 if kind == "timeout" else 429 if kind == "rate_limit" else 502
+    raise HTTPException(status_code=status, detail=err)
+
+
+static_dir = BASE_DIR / "static"
+static_dir.mkdir(exist_ok=True)
+
+app.mount("/assets", StaticFiles(directory=static_dir), name="assets")
+
+
+@app.get("/")
+def index():
+    return FileResponse(static_dir / "index.html")
