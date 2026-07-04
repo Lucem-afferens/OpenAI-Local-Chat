@@ -36,5 +36,5 @@
 - Экспорт: копирование, TXT, Markdown
 - Локализация ошибок OpenAI на русский
 
-[Unreleased]: https://github.com/YOUR_USERNAME/openai-local-chat/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/YOUR_USERNAME/openai-local-chat/releases/tag/v1.0.0
+[Unreleased]: https://github.com/Lucem-afferens/OpenAI-Local-Chat/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/Lucem-afferens/OpenAI-Local-Chat/releases/tag/v1.0.0

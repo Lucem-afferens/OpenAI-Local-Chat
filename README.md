@@ -1,9 +1,12 @@
 # OpenAI Local Chat
 
-**Локальный веб-чат с OpenAI API** — FastAPI-бэкенд и одностраничный UI без сборки фронтенда.  
-Ключ API хранится **только на сервере** и никогда не попадает в браузер.
+**Локальный веб-чат с OpenAI API** — FastAPI-бэкенд и одностраничный UI без сборки фронтенда.
 
-> **English:** Self-hosted OpenAI chat UI with session history, auto model routing, image generation/editing, billing widget, and Russian-first UX. Runs on Python + FastAPI + SQLite.
+**Как пользоваться:** склонируйте репозиторий на **свой компьютер**, добавьте свой `OPENAI_API_KEY` в `.env`, запустите — откройте в браузере. Никакого облачного деплоя не требуется: каждый запускает копию у себя и платит только за свой ключ OpenAI.
+
+Ключ API хранится **только в локальном процессе** (Python) и не попадает в браузер.
+
+> **English:** Clone, add your API key, run locally — personal OpenAI chat UI with history, auto routing, images, and Russian-first UX. Python + FastAPI + SQLite. No hosted service.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
@@ -65,16 +68,18 @@
 
 ## Быстрый старт
 
+Три шага: **clone → `.env` → run**. Docker не нужен.
+
 ### Требования
 
 - **Python 3.10+**
-- Аккаунт OpenAI и [API key](https://platform.openai.com/api-keys)
+- Аккаунт OpenAI и [свой API key](https://platform.openai.com/api-keys)
 
 ### Установка
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/openai-local-chat.git
-cd openai-local-chat
+git clone https://github.com/Lucem-afferens/OpenAI-Local-Chat.git
+cd OpenAI-Local-Chat
 
 python3 -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
@@ -91,16 +96,11 @@ cp .env.example .env
 uvicorn app:app --reload --host 127.0.0.1 --port 8765
 ```
 
-**Docker (опционально):**
-
-```bash
-cp .env.example .env   # задайте OPENAI_API_KEY
-docker compose up -d --build
-```
-
-Подробнее: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
-
 Откройте в браузере: **http://127.0.0.1:8765**
+
+История чатов сохраняется локально в `data/chat.sqlite` на вашем диске.
+
+**Docker** — необязательная альтернатива тому же локальному запуску; см. [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) (раздел Docker).
 
 ### Первые шаги в UI
 
@@ -140,7 +140,7 @@ openai-local-chat/
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Архитектура, потоки данных, авто-роутинг, фоновые задачи |
 | [docs/API.md](docs/API.md) | Справочник HTTP API |
 | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | Переменные окружения и настройки UI |
-| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Production: systemd, Docker, reverse proxy |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Docker и прочее (опционально; для типичного использования не нужно) |
 | [SECURITY.md](SECURITY.md) | Угрозы, рекомендации для публичного доступа |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Как внести вклад |
 | [CHANGELOG.md](CHANGELOG.md) | История изменений |
@@ -154,14 +154,11 @@ openai-local-chat/
 
 ## Безопасность
 
-⚠️ **По умолчанию приложение не аутентифицирует пользователей.** Любой, кто может открыть URL, отправляет запросы **от вашего API-ключа** и тратит ваш баланс.
+Рассчитано на **личный локальный запуск** (`127.0.0.1`): только вы на своём компьютере.
 
-Рекомендации:
-
-- Запускайте только на **`127.0.0.1`**, если работаете один.
-- Для доступа из сети — VPN, SSH-туннель или reverse proxy с auth (см. [SECURITY.md](SECURITY.md)).
-- **Никогда** не коммитьте `.env` и реальные ключи.
-- Admin key для биллинга храните отдельно и с минимальными правами.
+- **Никогда** не коммитьте `.env` и не публикуйте API key.
+- Ключ видит только ваш локальный Python-процесс, не другие пользователи GitHub.
+- Не открывайте порт наружу (`0.0.0.0` без auth) — иначе любой в сети сможет тратить ваш баланс. Подробнее: [SECURITY.md](SECURITY.md).
 
 Сообщения об уязвимостях: см. [SECURITY.md](SECURITY.md).
 

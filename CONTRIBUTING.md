@@ -6,7 +6,7 @@
 
 ## Перед началом
 
-1. Оформите [issue](https://github.com/YOUR_USERNAME/openai-local-chat/issues) для крупных изменений — обсудим подход.
+1. Оформите [issue](https://github.com/Lucem-afferens/OpenAI-Local-Chat/issues) для крупных изменений — обсудим подход.
 2. Убедитесь, что изменение вписывается в scope: локальный UI-прокси к OpenAI без тяжёлой инфраструктуры.
 
 ---
@@ -14,8 +14,8 @@
 ## Окружение разработки
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/openai-local-chat.git
-cd openai-local-chat
+git clone https://github.com/Lucem-afferens/OpenAI-Local-Chat.git
+cd OpenAI-Local-Chat
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt

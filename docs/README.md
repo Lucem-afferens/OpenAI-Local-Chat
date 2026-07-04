@@ -7,7 +7,7 @@
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Компоненты, SQLite, авто-роутинг, фоновые задачи, биллинг |
 | [API.md](API.md) | Справочник всех HTTP-эндпоинтов |
 | [CONFIGURATION.md](CONFIGURATION.md) | `.env`, localStorage, константы сервера |
-| [DEPLOYMENT.md](DEPLOYMENT.md) | systemd, Docker, nginx/Caddy, бэкапы |
+| [DEPLOYMENT.md](DEPLOYMENT.md) | Docker, systemd, nginx — **опционально**, не для типичного clone & run |
 
 Корень репозитория:
 
