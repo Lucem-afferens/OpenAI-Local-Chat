@@ -1,5 +1,6 @@
-const { requireApiKey } = require("./_lib/auth");
-const { openaiFetch } = require("./_lib/openai");
+const { requireApiKey } = require("../lib/vercel/auth");
+const { openaiFetch } = require("../lib/vercel/openai");
+const { sendJson, methodNotAllowed } = require("../lib/vercel/http");
 
 const FALLBACK_CHAT_MODELS = [
   "gpt-4o-mini",
@@ -28,7 +29,7 @@ function isLikelyChatModel(id) {
 
 module.exports = async (req, res) => {
   if (req.method !== "GET") {
-    res.status(405).json({ message: "Method not allowed" });
+    methodNotAllowed(res);
     return;
   }
   const apiKey = requireApiKey(req, res);
@@ -37,12 +38,12 @@ module.exports = async (req, res) => {
     const data = await openaiFetch(apiKey, "/models");
     const ids = [...new Set((data.data || []).map((m) => m.id).filter(isLikelyChatModel))].sort();
     if (!ids.length) {
-      res.status(200).json({ models: FALLBACK_CHAT_MODELS, source: "fallback_empty" });
+      sendJson(res, 200, { models: FALLBACK_CHAT_MODELS, source: "fallback_empty" });
       return;
     }
-    res.status(200).json({ models: ids, source: "openai" });
+    sendJson(res, 200, { models: ids, source: "openai" });
   } catch (e) {
-    res.status(200).json({
+    sendJson(res, 200, {
       models: FALLBACK_CHAT_MODELS,
       source: "fallback_error",
       warning: e.message,

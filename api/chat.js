@@ -1,9 +1,10 @@
-const { requireApiKey } = require("./_lib/auth");
-const { executeChatWithRouting, httpError } = require("./_lib/chat");
+const { requireApiKey } = require("../lib/vercel/auth");
+const { executeChatWithRouting, httpError } = require("../lib/vercel/chat");
+const { sendJson, methodNotAllowed } = require("../lib/vercel/http");
 
 module.exports = async (req, res) => {
   if (req.method !== "POST") {
-    res.status(405).json({ message: "Method not allowed" });
+    methodNotAllowed(res);
     return;
   }
   const apiKey = requireApiKey(req, res);
@@ -13,25 +14,25 @@ module.exports = async (req, res) => {
   try {
     body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
   } catch {
-    res.status(400).json({ message: "Invalid JSON" });
+    sendJson(res, 400, { message: "Invalid JSON" });
     return;
   }
   if (!body?.message?.trim() || !body?.model?.trim()) {
-    res.status(400).json({ message: "Нужны поля model и message" });
+    sendJson(res, 400, { message: "Нужны поля model и message" });
     return;
   }
 
   try {
     const outcome = await executeChatWithRouting(apiKey, body);
     if (outcome.ok) {
-      res.status(200).json(outcome.data);
+      sendJson(res, 200, outcome.data);
       return;
     }
     const err = outcome.error || { kind: "unknown", message: "Неизвестная ошибка." };
     const status = err.kind === "timeout" ? 504 : err.kind === "rate_limit" ? 429 : 502;
-    res.status(status).json({ detail: err });
+    sendJson(res, status, { detail: err });
   } catch (e) {
     const { status, detail } = httpError(e);
-    res.status(status).json({ detail });
+    sendJson(res, status, { detail });
   }
 };

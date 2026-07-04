@@ -1,6 +1,7 @@
 const Busboy = require("busboy");
-const { requireApiKey } = require("../_lib/auth");
-const { OPENAI_BASE } = require("../_lib/openai");
+const { requireApiKey } = require("../../lib/vercel/auth");
+const { OPENAI_BASE } = require("../../lib/vercel/openai");
+const { sendJson, methodNotAllowed } = require("../../lib/vercel/http");
 
 function parseMultipart(req) {
   return new Promise((resolve, reject) => {
@@ -25,7 +26,7 @@ function parseMultipart(req) {
 
 async function handler(req, res) {
   if (req.method !== "POST") {
-    res.status(405).json({ message: "Method not allowed" });
+    methodNotAllowed(res);
     return;
   }
   const apiKey = requireApiKey(req, res);
@@ -36,7 +37,7 @@ async function handler(req, res) {
     const prompt = String(fields.prompt || "").trim();
     const model = String(fields.model || "gpt-image-1.5").trim();
     if (!prompt || !files.image) {
-      res.status(400).json({ message: "Нужны prompt и image" });
+      sendJson(res, 400, { message: "Нужны prompt и image" });
       return;
     }
 
@@ -74,7 +75,7 @@ async function handler(req, res) {
     });
     const data = await resp.json();
     if (!resp.ok) {
-      res.status(resp.status).json({ detail: { message: data?.error?.message || "OpenAI error" } });
+      sendJson(res, resp.status, { detail: { message: data?.error?.message || "OpenAI error" } });
       return;
     }
     const items = (data.data || []).map((img) => {
@@ -83,7 +84,7 @@ async function handler(req, res) {
       if (img.url) entry.url = img.url;
       return entry;
     });
-    res.status(200).json({
+    sendJson(res, 200, {
       images: items,
       model,
       usage: data.usage || null,
@@ -91,7 +92,7 @@ async function handler(req, res) {
       api: "images.edit",
     });
   } catch (e) {
-    res.status(502).json({ detail: { message: e.message || "Upload failed" } });
+    sendJson(res, 502, { detail: { message: e.message || "Upload failed" } });
   }
 }
 

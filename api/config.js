@@ -1,5 +1,11 @@
+const { sendJson } = require("../lib/vercel/http");
+
 module.exports = (req, res) => {
-  res.status(200).json({
+  if (req.method && req.method !== "GET") {
+    sendJson(res, 405, { message: "Method not allowed" });
+    return;
+  }
+  sendJson(res, 200, {
     deployment: "vercel",
     server_key_configured: false,
     require_client_key: true,

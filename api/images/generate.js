@@ -1,5 +1,6 @@
-const { requireApiKey } = require("./_lib/auth");
-const { openaiFetch } = require("./_lib/openai");
+const { requireApiKey } = require("../../lib/vercel/auth");
+const { openaiFetch } = require("../../lib/vercel/openai");
+const { sendJson, methodNotAllowed } = require("../../lib/vercel/http");
 
 function buildGeneratePayload(body) {
   const mid = String(body.model || "").trim().toLowerCase();
@@ -50,7 +51,7 @@ function packImages(resp, model, apiTag) {
 
 module.exports = async (req, res) => {
   if (req.method !== "POST") {
-    res.status(405).json({ message: "Method not allowed" });
+    methodNotAllowed(res);
     return;
   }
   const apiKey = requireApiKey(req, res);
@@ -59,11 +60,11 @@ module.exports = async (req, res) => {
   try {
     body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
   } catch {
-    res.status(400).json({ message: "Invalid JSON" });
+    sendJson(res, 400, { message: "Invalid JSON" });
     return;
   }
   if (!body?.prompt?.trim()) {
-    res.status(400).json({ message: "Нужен prompt" });
+    sendJson(res, 400, { message: "Нужен prompt" });
     return;
   }
   try {
@@ -72,8 +73,8 @@ module.exports = async (req, res) => {
       method: "POST",
       body: JSON.stringify(payload),
     });
-    res.status(200).json(packImages(resp, payload.model, "images.generate"));
+    sendJson(res, 200, packImages(resp, payload.model, "images.generate"));
   } catch (e) {
-    res.status(e.status || 502).json({ detail: { message: e.message } });
+    sendJson(res, e.status || 502, { detail: { message: e.message } });
   }
 };
