@@ -11,6 +11,7 @@ import os
 import re
 import threading
 import time
+from contextvars import ContextVar
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -20,7 +21,7 @@ import store
 
 import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from openai import (
@@ -41,22 +42,53 @@ REPO_ROOT = BASE_DIR.parent
 load_dotenv(REPO_ROOT / ".env")
 load_dotenv(BASE_DIR / ".env")
 
-_api_key = os.getenv("OPENAI_API_KEY")
-if not _api_key or not _api_key.strip():
-    raise RuntimeError(
-        "OPENAI_API_KEY не задан. Создайте .env из .env.example и добавьте ключ OpenAI."
-    )
-
 # Таймауты: Pro может считать очень долго; ошибки API — без лишних retry (честный ответ сразу).
 TIMEOUT_DEFAULT = httpx.Timeout(connect=30.0, read=1800.0, write=90.0, pool=60.0)
 TIMEOUT_PRO = httpx.Timeout(connect=60.0, read=7200.0, write=180.0, pool=120.0)
 PRO_READ_TIMEOUT_SEC = 7200
 
-client = OpenAI(
-    api_key=_api_key.strip(),
-    timeout=TIMEOUT_DEFAULT,
-    max_retries=0,
-)
+_api_key_env = (os.getenv("OPENAI_API_KEY") or "").strip() or None
+_request_api_key: ContextVar[str | None] = ContextVar("request_api_key", default=None)
+
+
+def _api_key_from_headers(authorization: str | None, x_openai_key: str | None) -> str | None:
+    auth = (authorization or "").strip()
+    if auth.lower().startswith("bearer "):
+        key = auth[7:].strip()
+        if key:
+            return key
+    header = (x_openai_key or "").strip()
+    return header or None
+
+
+def _effective_api_key() -> str:
+    key = _request_api_key.get() or _api_key_env
+    if not key:
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "kind": "missing_api_key",
+                "message": (
+                    "API-ключ не задан. Добавьте OPENAI_API_KEY в .env "
+                    "или укажите ключ в настройках (хранится только в вашем браузере)."
+                ),
+            },
+        )
+    return key
+
+
+def _get_client(*, timeout: httpx.Timeout | None = None) -> OpenAI:
+    return OpenAI(
+        api_key=_effective_api_key(),
+        timeout=timeout or TIMEOUT_DEFAULT,
+        max_retries=0,
+    )
+
+
+if not _api_key_env:
+    logger.warning(
+        "OPENAI_API_KEY не задан в .env — ожидается ключ клиента в заголовке Authorization."
+    )
 
 _billing_cache: dict = {"at": 0.0, "payload": None}
 BILLING_CACHE_SEC = 60
@@ -657,7 +689,7 @@ def _responses_stream_api(
     text_parts: list[str] = []
     _job_cancel_check(job_id)
     _mark_job_openai_started(job_id)
-    with client.responses.stream(**kwargs, timeout=timeout) as stream:
+    with _get_client(timeout=timeout).responses.stream(**kwargs, timeout=timeout) as stream:
         for event in stream:
             etype = getattr(event, "type", None)
             if etype == "response.output_text.delta":
@@ -734,7 +766,7 @@ def _responses_api(body: ChatBody, *, job_id: str | None = None) -> dict:
     if pro:
         return _responses_stream_api(kwargs, timeout, job_id=job_id)
 
-    resp = client.responses.create(**kwargs, timeout=timeout)
+    resp = _get_client(timeout=timeout).responses.create(**kwargs, timeout=timeout)
     text = _text_from_responses(resp)
     usage = resp.usage.model_dump() if resp.usage else None
     if not text and resp.status == "completed":
@@ -762,7 +794,7 @@ def _completions_fallback(body: ChatBody, *, job_id: str | None = None) -> dict:
         prompt = f"{body.system.strip()}\n\n{body.message.strip()}"
     else:
         prompt = body.message.strip()
-    resp = client.completions.create(
+    resp = _get_client(timeout=_timeout_for_model(body.model.strip())).completions.create(
         model=body.model.strip(),
         prompt=prompt,
         max_tokens=4096,
@@ -823,7 +855,7 @@ def _classify_request_tier(body: ChatBody, *, job_id: str | None = None) -> dict
     )
     try:
         _mark_job_openai_started(job_id)
-        resp = client.chat.completions.create(
+        resp = _get_client(timeout=TIMEOUT_DEFAULT).chat.completions.create(
             model=CLASSIFIER_MODEL,
             messages=[
                 {"role": "system", "content": system},
@@ -930,7 +962,7 @@ def _execute_chat_sync(body: ChatBody, *, job_id: str | None = None) -> dict:
         try:
             _job_cancel_check(job_id)
             _mark_job_openai_started(job_id)
-            resp = client.chat.completions.create(
+            resp = _get_client(timeout=_timeout_for_model(model)).chat.completions.create(
                 model=model,
                 messages=messages,
                 timeout=_timeout_for_model(model),
@@ -1080,6 +1112,34 @@ async def _lifespan(_app: FastAPI):
 app = FastAPI(title="OpenAI Local Chat", lifespan=_lifespan)
 
 
+@app.middleware("http")
+async def bind_request_api_key(request: Request, call_next):
+    key = _api_key_from_headers(
+        request.headers.get("authorization"),
+        request.headers.get("x-openai-api-key"),
+    )
+    token = _request_api_key.set(key)
+    try:
+        response = await call_next(request)
+        response.headers["Cache-Control"] = "no-store"
+        return response
+    finally:
+        _request_api_key.reset(token)
+
+
+@app.get("/api/config")
+def api_config():
+    return {
+        "deployment": "local",
+        "server_key_configured": bool(_api_key_env),
+        "require_client_key": not bool(_api_key_env),
+        "server_sessions": True,
+        "server_billing": True,
+        "sync_chat": False,
+        "max_duration_hint_sec": PRO_READ_TIMEOUT_SEC,
+    }
+
+
 class SessionCreateBody(BaseModel):
     title: str | None = None
     system: str | None = None
@@ -1089,11 +1149,13 @@ class SessionCreateBody(BaseModel):
 @app.get("/api/models")
 def api_models():
     try:
-        listed = client.models.list()
+        listed = _get_client().models.list()
         ids = sorted({m.id for m in listed.data if _is_likely_chat_model(m.id)})
         if not ids:
             return {"models": FALLBACK_CHAT_MODELS, "source": "fallback_empty"}
         return {"models": ids, "source": "openai"}
+    except HTTPException:
+        raise
     except Exception as e:
         return {
             "models": FALLBACK_CHAT_MODELS,
@@ -1519,7 +1581,7 @@ def api_chat(body: ChatBody):
 @app.get("/api/image-models")
 def api_image_models():
     try:
-        listed = client.models.list()
+        listed = _get_client().models.list()
         ids = sorted({m.id for m in listed.data if _is_image_model(m.id)})
         if not ids:
             return {"models": FALLBACK_IMAGE_MODELS, "source": "fallback_empty"}
@@ -1593,7 +1655,7 @@ def _build_generate_kwargs(body: ImageGenerateBody) -> dict:
 def api_images_generate(body: ImageGenerateBody):
     try:
         kwargs = _build_generate_kwargs(body)
-        resp = client.images.generate(**kwargs)
+        resp = _get_client().images.generate(**kwargs)
         return _pack_images_payload(resp, body.model.strip(), "images.generate")
     except Exception as e:
         _raise_openai_error(e)
@@ -1653,7 +1715,7 @@ async def api_images_edit(
             mask_max = MAX_IMAGE_BYTES_DALLE2_EDIT if mid.startswith("dall-e-2") else MAX_IMAGE_BYTES_GPT
             kwargs["mask"] = await _upload_tuple(mask, "mask.png", mask_max)
 
-        resp = client.images.edit(**kwargs)
+        resp = _get_client().images.edit(**kwargs)
         return _pack_images_payload(resp, model.strip(), "images.edit")
     except HTTPException:
         raise

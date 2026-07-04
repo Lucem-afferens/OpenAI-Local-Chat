@@ -1,0 +1,18 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run vercel-build",
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" }
+      ]
+    }
+  ],
+  "functions": {
+    "api/chat.js": { "maxDuration": 60 },
+    "api/images/generate.js": { "maxDuration": 60 },
+    "api/images/edit.js": { "maxDuration": 60 }
+  }
+}

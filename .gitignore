@@ -12,3 +12,4 @@ drift.txt
 # Локальные данные приложения (SQLite, настройки биллинга)
 data/*
 !data/.gitignore
+public/

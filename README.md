@@ -102,13 +102,17 @@ uvicorn app:app --reload --host 127.0.0.1 --port 8765
 
 **Docker** — необязательная альтернатива тому же локальному запуску; см. [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) (раздел Docker).
 
+### Веб на Vercel
+
+Import репозитория в [Vercel](https://vercel.com) — **`OPENAI_API_KEY` на сервере не нужен**. Каждый пользователь вводит свой ключ в UI; он хранится в **localStorage** браузера. Подробно: [docs/VERCEL.md](docs/VERCEL.md).
+
 ### Первые шаги в UI
 
 1. Выберите **модель** в верхней панели или включите **«Авто»** в настройках.
 2. Напишите сообщение и нажмите **↑** или **Ctrl/Cmd+Enter**.
 3. При необходимости прикрепите **`.md` / `.txt`** (📎).
 4. Перейдите в **🖼 Изображения** для генерации или редактирования картинок.
-5. В **⚙ Настройки** задайте system prompt, язык ответа и (опционально) баланс OpenAI.
+5. В **⚙ Настройки** задайте system prompt, язык ответа, API key (если нет `.env`) и (локально) баланс OpenAI.
 
 ---
 
@@ -118,8 +122,10 @@ uvicorn app:app --reload --host 127.0.0.1 --port 8765
 openai-local-chat/
 ├── app.py              # FastAPI: API, OpenAI, роутинг, биллинг, изображения
 ├── store.py            # SQLite: сессии, сообщения, billing.json
+├── api/                # Vercel serverless (прокси OpenAI, без хранения ключей)
 ├── static/
-│   └── index.html      # UI (HTML + CSS + JS, без сборки)
+│   ├── index.html      # UI
+│   └── runtime.js      # dual-mode: local / Vercel
 ├── data/               # Локальные данные (не в git)
 │   ├── chat.sqlite
 │   └── billing.json
@@ -140,6 +146,7 @@ openai-local-chat/
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Архитектура, потоки данных, авто-роутинг, фоновые задачи |
 | [docs/API.md](docs/API.md) | Справочник HTTP API |
 | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | Переменные окружения и настройки UI |
+| [docs/VERCEL.md](docs/VERCEL.md) | Деплой на Vercel, ключ клиента в браузере |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Docker и прочее (опционально; для типичного использования не нужно) |
 | [SECURITY.md](SECURITY.md) | Угрозы, рекомендации для публичного доступа |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Как внести вклад |
@@ -154,11 +161,13 @@ openai-local-chat/
 
 ## Безопасность
 
-Рассчитано на **личный локальный запуск** (`127.0.0.1`): только вы на своём компьютере.
+Рассчитано на **личный локальный запуск** (`127.0.0.1`) или **Vercel** с ключом в браузере.
 
-- **Никогда** не коммитьте `.env` и не публикуйте API key.
-- Ключ видит только ваш локальный Python-процесс, не другие пользователи GitHub.
-- Не открывайте порт наружу (`0.0.0.0` без auth) — иначе любой в сети сможет тратить ваш баланс. Подробнее: [SECURITY.md](SECURITY.md).
+- **Никогда** не коммитьте `.env` и не публикуйте API key в issue/PR.
+- **Локально:** ключ в `.env` или в настройках UI (localStorage).
+- **Vercel:** только ключ в браузере; serverless-прокси не сохраняет его.
+- Ключ в localStorage доступен скриптам на том же origin — не вводите на чужих ПК.
+- Не открывайте порт `0.0.0.0` без auth на своём сервере. Подробнее: [SECURITY.md](SECURITY.md).
 
 Сообщения об уязвимостях: см. [SECURITY.md](SECURITY.md).
 

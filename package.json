@@ -1,0 +1,10 @@
+{
+  "name": "openai-local-chat",
+  "private": true,
+  "scripts": {
+    "vercel-build": "mkdir -p public/assets && cp static/index.html public/index.html && cp static/runtime.js public/assets/runtime.js"
+  },
+  "dependencies": {
+    "busboy": "^1.6.0"
+  }
+}

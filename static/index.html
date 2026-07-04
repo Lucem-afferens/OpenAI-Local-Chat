@@ -1374,6 +1374,27 @@
 
   <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="true"></div>
 
+  <div class="modal-backdrop" id="api-key-modal">
+    <div class="modal">
+      <h3>API-ключ OpenAI</h3>
+      <p class="hint" style="margin:0 0 0.85rem">
+        Ключ нужен для запросов к OpenAI. Он сохраняется <strong>только в вашем браузере</strong> (localStorage)
+        и передаётся в заголовке запроса. Мы не храним ключ на сервере и не пишем его в репозиторий.
+      </p>
+      <label for="api-key-modal-input">Ключ</label>
+      <input
+        type="password"
+        id="api-key-modal-input"
+        autocomplete="off"
+        placeholder="sk-…"
+        style="width:100%;margin:0.35rem 0 0.85rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:0.5rem;padding:0.55rem 0.65rem;"
+      />
+      <div class="modal-actions">
+        <button type="button" class="primary" id="api-key-modal-save">Сохранить и продолжить</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-backdrop" id="settings-modal">
     <div class="modal">
       <h3>Настройки</h3>
@@ -1392,6 +1413,22 @@
         <span>Разрешить Pro для задач с рассуждением</span>
       </label>
       <p class="hint" id="routing-hint" style="margin:0 0 0.85rem">В режиме «Авто» сервер подбирает модель: mini для простых, GPT-5.5 или 4o для сложных, Pro — только если включено выше.</p>
+      <div id="api-key-settings-block" hidden>
+        <label for="api-key-input">OpenAI API key</label>
+        <input
+          type="password"
+          id="api-key-input"
+          autocomplete="off"
+          placeholder="sk-…"
+          style="width:100%;margin:0.35rem 0 0.35rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:0.5rem;padding:0.55rem 0.65rem;"
+        />
+        <p class="hint" style="margin:0 0 0.5rem">
+          Хранится только в localStorage вашего браузера. На сервер не записывается.
+          <span id="api-key-mask"></span>
+        </p>
+        <button type="button" id="api-key-clear" style="margin-bottom:0.85rem">Удалить ключ из браузера</button>
+      </div>
+      <div id="billing-settings-block">
       <label for="billing-credit">Баланс OpenAI, $</label>
       <input
         type="number"
@@ -1405,6 +1442,7 @@
         Вставьте актуальную сумму с billing/overview и нажмите «Сохранить» — это синхронизация.
         Каждое сохранение сбрасывает отсчёт расхода. Нужен <code>OPENAI_ADMIN_API_KEY</code> в .env.
       </p>
+      </div>
       <label for="system">Дополнительная инструкция (необязательно)</label>
       <input type="text" id="system" placeholder="Например: отвечай кратко и структурированно." />
       <p class="hint">По умолчанию модель отвечает на русском. Смените язык выше, если нужен другой.</p>
@@ -1415,12 +1453,40 @@
     </div>
   </div>
 
+  <script src="/assets/runtime.js"></script>
   <script>
     const $ = (id) => document.getElementById(id);
 
-    function apiFetch(url, options) {
-      return fetch(url, { cache: "no-store", ...options });
+    async function apiFetch(url, options) {
+      return AppRuntime.apiFetch(url, options);
     }
+
+    function syncApiKeyFields() {
+      const key = AppRuntime.getApiKey();
+      if ($("api-key-input")) $("api-key-input").value = key;
+      if ($("api-key-modal-input")) $("api-key-modal-input").value = key;
+      if ($("api-key-mask")) $("api-key-mask").textContent = key ? " Текущий: " + AppRuntime.maskKey(key) : "";
+    }
+
+    function openApiKeyModal() {
+      syncApiKeyFields();
+      $("api-key-modal").classList.add("show");
+      $("api-key-modal-input").focus();
+    }
+
+    function applyDeploymentConfig() {
+      const cfg = AppRuntime.getConfig() || {};
+      const needKey = AppRuntime.needsClientKey();
+      $("api-key-settings-block").hidden = !needKey;
+      const billingOn = AppRuntime.useServerBilling();
+      $("billing-settings-block").hidden = !billingOn;
+      $("billing-widget").hidden = !billingOn;
+      if (cfg.deployment === "vercel") {
+        showToast("Веб-режим: история чатов хранится в вашем браузере", "info", 7000);
+      }
+    }
+
+    document.addEventListener("app:need-api-key", () => openApiKeyModal());
 
     const modelSel = $("model");
     const modelPicker = $("model-picker");
@@ -1791,6 +1857,7 @@
     }
 
     async function loadBilling(force) {
+      if (!AppRuntime.useServerBilling()) return;
       const now = Date.now();
       if (!force && now - lastBillingFetch < 60000) return;
       lastBillingFetch = now;
@@ -1805,6 +1872,7 @@
     }
 
     async function saveBillingCredit() {
+      if (!AppRuntime.useServerBilling()) return true;
       const raw = $("billing-credit").value.trim();
       if (!raw) return true;
       const val = parseFloat(raw.replace(",", "."));
@@ -1834,6 +1902,8 @@
       $("routing-mode").value = localStorage.getItem(ROUTING_MODE_KEY) || "manual";
       $("allow-pro").checked = localStorage.getItem(ALLOW_PRO_KEY) === "1";
       $("allow-pro-wrap").style.display = $("routing-mode").value === "auto" ? "flex" : "none";
+      syncApiKeyFields();
+      if (!AppRuntime.useServerBilling()) return;
       try {
         const r = await apiFetch("/api/billing");
         if (r.ok) {
@@ -1847,6 +1917,11 @@
       localStorage.setItem(REPLY_LANG_KEY, $("reply-lang").value || "ru");
       localStorage.setItem(ROUTING_MODE_KEY, $("routing-mode").value || "manual");
       localStorage.setItem(ALLOW_PRO_KEY, $("allow-pro").checked ? "1" : "0");
+      if (AppRuntime.needsClientKey()) {
+        const key = $("api-key-input").value.trim();
+        if (key) AppRuntime.setApiKey(key);
+      }
+      syncApiKeyFields();
       applyRoutingModeUI();
     }
 
@@ -2132,14 +2207,26 @@
       e.stopPropagation();
       e.preventDefault();
       try {
-        const r = await fetch("/api/sessions/" + encodeURIComponent(id) + "/archive", { method: "POST" });
+        if (AppRuntime.useClientSessions()) {
+          await AppRuntime.archiveSession(id);
+          if (id === activeSessionId) {
+            const active = await AppRuntime.listSessions(false);
+            const next = active.find((s) => s.id !== id);
+            if (next) await switchSession(next.id);
+            else await newChat();
+          }
+          await loadSessionList();
+          showToast("Чат перемещён в архив", "success");
+          return;
+        }
+        const r = await apiFetch("/api/sessions/" + encodeURIComponent(id) + "/archive", { method: "POST" });
         if (!r.ok) {
           const data = await r.json().catch(() => ({}));
           showToast(fmtDetail(data.detail, r.status), "error");
           return;
         }
         if (id === activeSessionId) {
-          const listR = await fetch("/api/sessions");
+          const listR = await apiFetch("/api/sessions");
           const listData = await listR.json();
           const next = (listData.sessions || []).find((s) => s.id !== id);
           if (next) await switchSession(next.id);
@@ -2157,7 +2244,17 @@
       e.preventDefault();
       if (!confirm("Удалить чат навсегда? Это действие нельзя отменить.")) return;
       try {
-        const r = await fetch("/api/sessions/" + encodeURIComponent(id), { method: "DELETE" });
+        if (AppRuntime.useClientSessions()) {
+          if (!(await AppRuntime.deleteSession(id))) {
+            showToast("Удалить можно только чат из архива", "warn");
+            return;
+          }
+          if (id === activeSessionId) await newChat();
+          await loadSessionList();
+          showToast("Чат удалён", "success");
+          return;
+        }
+        const r = await apiFetch("/api/sessions/" + encodeURIComponent(id), { method: "DELETE" });
         if (!r.ok) {
           const data = await r.json().catch(() => ({}));
           showToast(fmtDetail(data.detail, r.status), "error");
@@ -2446,6 +2543,7 @@
     }
 
     async function liveSyncTick() {
+      if (AppRuntime.useSyncChat()) return;
       try {
         const pr = await apiFetch("/api/jobs/pending");
         if (pr.ok) {
@@ -2485,6 +2583,27 @@
 
     async function loadSessionList() {
       try {
+        if (AppRuntime.useClientSessions()) {
+          const active = await AppRuntime.listSessions(false);
+          const archived = await AppRuntime.listSessions(true);
+          const list = $("session-list");
+          list.innerHTML = "";
+          if (!active.length) {
+            list.innerHTML = '<p class="hint" style="padding:0.5rem 0.65rem">Нет чатов</p>';
+          } else {
+            active.forEach((s) => list.appendChild(makeSessionRow(s, { archived: false })));
+          }
+          $("archive-count").textContent = String(archived.length);
+          const archList = $("archive-list");
+          archList.innerHTML = "";
+          if (!archived.length) {
+            archList.innerHTML = '<p class="hint" style="padding:0.35rem 0.55rem">Архив пуст</p>';
+          } else {
+            archived.forEach((s) => archList.appendChild(makeSessionRow(s, { archived: true })));
+          }
+          $("archive-list").hidden = !archiveExpanded;
+          return;
+        }
         const [activeR, archR] = await Promise.all([
           apiFetch("/api/sessions"),
           apiFetch("/api/sessions/archived/list"),
@@ -2524,6 +2643,13 @@
     }
 
     async function createSession() {
+      if (AppRuntime.useClientSessions()) {
+        const session = await AppRuntime.createSession();
+        const sid = session.id;
+        localStorage.setItem(SESSION_KEY, sid);
+        activeSessionId = sid;
+        return sid;
+      }
       const r = await apiFetch("/api/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2559,6 +2685,22 @@
 
     async function loadSession(depth = 0, { syncModel = false, scrollToBottom = false } = {}) {
       if (!activeSessionId) await ensureSession();
+      if (AppRuntime.useClientSessions()) {
+        const data = await AppRuntime.getSessionBundle(activeSessionId);
+        if (!data) {
+          if (depth >= 2) throw new Error("Не удалось загрузить чат (сессия не найдена)");
+          localStorage.removeItem(SESSION_KEY);
+          activeSessionId = null;
+          await ensureSession();
+          return loadSession(depth + 1, { syncModel, scrollToBottom });
+        }
+        sessionMessages = data.messages || [];
+        setArchivedView(!!data.session?.archived_at);
+        if (data.session?.system && !$("system").value.trim()) $("system").value = data.session.system;
+        if (syncModel) applyModelForSession(data.session);
+        renderHistory(sessionMessages, { scrollToBottom: scrollToBottom || syncModel });
+        return;
+      }
       const r = await apiFetch("/api/sessions/" + encodeURIComponent(activeSessionId));
       if (!r.ok) {
         if (depth >= 2) throw new Error("Не удалось загрузить чат (сессия не найдена)");
@@ -2720,7 +2862,13 @@
       modelPickerHint.textContent = "Получаем список OpenAI";
       $("model-trigger").disabled = true;
       try {
-        const r = await fetch("/api/models");
+        const r = await apiFetch("/api/models");
+        if (r.status === 401 && AppRuntime.needsClientKey()) {
+          openApiKeyModal();
+          modelPickerName.textContent = "Нужен API-ключ";
+          modelPickerHint.textContent = "Укажите ключ в настройках";
+          return;
+        }
         const data = await r.json();
         chatModels = data.models || [];
         const selected = chatModels.includes(prev)
@@ -2764,6 +2912,77 @@
 
       try {
         await ensureSession();
+
+        if (AppRuntime.useSyncChat()) {
+          if (!AppRuntime.hasUsableKey()) {
+            openApiKeyModal();
+            showToast("Укажите API-ключ OpenAI", "warn");
+            return;
+          }
+          const ts = AppRuntime.now();
+          const userId = AppRuntime.uuid();
+          const assistantId = AppRuntime.uuid();
+          const title = message.slice(0, 60) + (message.length > 60 ? "…" : "");
+          await AppRuntime.appendMessage({
+            id: userId,
+            session_id: activeSessionId,
+            role: "user",
+            content: message,
+            status: "completed",
+            model: payload.model,
+            attachment_name: payload.attachment_name || null,
+            created_at: ts,
+          });
+          await AppRuntime.appendMessage({
+            id: assistantId,
+            session_id: activeSessionId,
+            role: "assistant",
+            content: "",
+            status: "running",
+            model: payload.model,
+            created_at: ts + 0.001,
+          });
+          await AppRuntime.touchSession(activeSessionId, { title, system, model: payload.model });
+          sessionMessages = await AppRuntime.getSessionMessages(activeSessionId);
+          $("msg").value = "";
+          autoResizeMsg();
+          $("ctx-file").value = "";
+          setCtxAttachment(null, null);
+          renderHistory(sessionMessages, { scrollToBottom: true });
+          await loadSessionList();
+          try {
+            const result = await AppRuntime.sendChatSync(payload);
+            const asst = {
+              id: assistantId,
+              session_id: activeSessionId,
+              role: "assistant",
+              content: result.reply || "",
+              status: "completed",
+              model: result.model || payload.model,
+              result,
+              created_at: ts + 0.001,
+              completed_at: AppRuntime.now(),
+            };
+            await AppRuntime.updateMessage(asst);
+          } catch (err) {
+            const asst = {
+              id: assistantId,
+              session_id: activeSessionId,
+              role: "assistant",
+              content: fmtDetail(err.detail, err.status) || err.message || "Ошибка",
+              status: "failed",
+              model: payload.model,
+              error: err.detail || { message: err.message },
+              created_at: ts + 0.001,
+              completed_at: AppRuntime.now(),
+            };
+            await AppRuntime.updateMessage(asst);
+          }
+          sessionMessages = await AppRuntime.getSessionMessages(activeSessionId);
+          renderHistory(sessionMessages, { scrollToBottom: true });
+          return;
+        }
+
         const r = await apiFetch("/api/sessions/" + encodeURIComponent(activeSessionId) + "/messages", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -3078,7 +3297,7 @@
       imgModelSel.innerHTML = "<option>Загрузка…</option>";
       imgModelSel.disabled = true;
       try {
-        const r = await fetch("/api/image-models");
+        const r = await apiFetch("/api/image-models");
         const data = await r.json();
         imgModelSel.innerHTML = "";
         (data.models || []).forEach((id) => {
@@ -3101,6 +3320,11 @@
     }
 
     async function sendImages() {
+      if (AppRuntime.needsClientKey() && !AppRuntime.hasUsableKey()) {
+        openApiKeyModal();
+        showToast("Укажите API-ключ OpenAI", "warn");
+        return;
+      }
       const model = imgModelSel.value?.trim();
       const prompt = $("img-prompt").value?.trim();
       const file = $("img-file").files?.[0];
@@ -3130,7 +3354,7 @@
           fd.append("image", file);
           if ($("img-mask").files?.[0]) fd.append("mask", $("img-mask").files[0]);
           fd.append("output_format", $("img-outfmt").value || "png");
-          r = await fetch("/api/images/edit", { method: "POST", body: fd });
+          r = await apiFetch("/api/images/edit", { method: "POST", body: fd });
         } else {
           const body = {
             model, prompt, size: imgSizeSel.value, quality: imgQualitySel.value,
@@ -3139,7 +3363,7 @@
           if (currentImageModelId().includes("gpt-image")) {
             body.output_format = $("img-outfmt").value || "png";
           }
-          r = await fetch("/api/images/generate", {
+          r = await apiFetch("/api/images/generate", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body),
@@ -3199,6 +3423,29 @@
     });
 
     async function bootstrap() {
+      await AppRuntime.init();
+      syncApiKeyFields();
+      applyDeploymentConfig();
+
+      $("api-key-modal-save").addEventListener("click", async () => {
+        const key = $("api-key-modal-input").value.trim();
+        if (!key) { showToast("Введите API-ключ", "warn"); return; }
+        AppRuntime.setApiKey(key);
+        syncApiKeyFields();
+        $("api-key-modal").classList.remove("show");
+        showToast("Ключ сохранён в браузере", "success", 2500);
+        await loadModels();
+        await loadImageModels();
+      });
+      $("api-key-modal").addEventListener("click", (e) => {
+        if (e.target === $("api-key-modal")) $("api-key-modal").classList.remove("show");
+      });
+      $("api-key-clear").addEventListener("click", () => {
+        AppRuntime.setApiKey("");
+        syncApiKeyFields();
+        showToast("Ключ удалён из браузера", "info", 2500);
+      });
+
       setView("chat");
       try {
         await loadModels();
@@ -3220,7 +3467,7 @@
         showToast("Список чатов: " + humanizeClientError(e), "warn");
       }
       startLiveSync();
-      await loadBilling(true);
+      if (AppRuntime.useServerBilling()) await loadBilling(true);
     }
 
     bootstrap();
