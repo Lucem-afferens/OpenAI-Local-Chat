@@ -162,6 +162,41 @@
     .archive-list { padding-top: 0.25rem; }
     .archive-list[hidden] { display: none; }
     .composer.archived-disabled { opacity: 0.55; pointer-events: none; }
+    .billing-widget {
+      display: block;
+      margin: 0 0.5rem 0.35rem;
+      padding: 0.55rem 0.65rem;
+      border-radius: 0.55rem;
+      border: 1px solid var(--border);
+      background: var(--bg-elevated);
+      text-decoration: none;
+      color: inherit;
+      transition: border-color 0.15s;
+    }
+    .billing-widget:hover { border-color: #555; }
+    .billing-widget[hidden] { display: none; }
+    .billing-label {
+      font-size: 0.68rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .billing-value {
+      display: block;
+      font-size: 1rem;
+      font-weight: 600;
+      margin-top: 0.15rem;
+      color: var(--text);
+    }
+    .billing-sub {
+      display: block;
+      font-size: 0.7rem;
+      color: var(--muted);
+      margin-top: 0.2rem;
+      line-height: 1.35;
+    }
+    .billing-widget.warn .billing-value { color: var(--warn); }
+    .billing-widget.low .billing-value { color: var(--err); }
     .sidebar-foot {
       border-top: 1px solid var(--border);
       padding: 0.5rem;
@@ -596,6 +631,357 @@
       height: 1.25rem;
     }
     .toast-close:hover { color: var(--text); }
+    .topbar-chat-only.hidden { display: none !important; }
+    .chat-view[hidden],
+    .images-view[hidden] {
+      display: none !important;
+    }
+    .images-view {
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .images-layout {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(280px, 22rem) 1fr;
+      gap: 1rem;
+      max-width: 76rem;
+      margin: 0 auto;
+      width: 100%;
+      padding: 1rem 1.25rem 1.25rem;
+    }
+    .images-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+      min-height: 0;
+      overflow-y: auto;
+      padding-right: 0.15rem;
+    }
+    .images-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+    .images-header h2 {
+      margin: 0;
+      font-size: 1.05rem;
+      font-weight: 600;
+    }
+    .images-header button {
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      border-radius: 0.5rem;
+      padding: 0.35rem 0.55rem;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    .images-header button:hover { color: var(--text); background: var(--bg-hover); }
+    .img-mode-tabs {
+      display: flex;
+      gap: 0.35rem;
+      padding: 0.2rem;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 0.65rem;
+    }
+    .img-mode-tab {
+      flex: 1;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-size: 0.8125rem;
+      font-weight: 500;
+      padding: 0.45rem 0.5rem;
+      border-radius: 0.45rem;
+      cursor: pointer;
+    }
+    .img-mode-tab.active {
+      background: var(--bg-main);
+      color: var(--text);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+    }
+    .img-mode-tab:disabled { opacity: 0.45; cursor: not-allowed; }
+    .images-field label {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-bottom: 0.35rem;
+    }
+    .images-field textarea,
+    .images-field select,
+    .images-field input[type="number"] {
+      width: 100%;
+      background: var(--bg-elevated);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 0.6rem;
+      padding: 0.55rem 0.65rem;
+      font-size: 0.875rem;
+    }
+    .images-field textarea {
+      min-height: 7.5rem;
+      resize: vertical;
+      line-height: 1.45;
+    }
+    .images-field textarea:focus,
+    .images-field select:focus {
+      outline: none;
+      border-color: #565656;
+    }
+    .img-drop-zone {
+      border: 1.5px dashed var(--border);
+      border-radius: 0.75rem;
+      padding: 1rem;
+      text-align: center;
+      cursor: pointer;
+      background: var(--bg-elevated);
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .img-drop-zone:hover,
+    .img-drop-zone.dragover {
+      border-color: var(--accent);
+      background: rgba(16, 163, 127, 0.06);
+    }
+    .img-drop-zone.has-file {
+      padding: 0.65rem;
+      cursor: default;
+    }
+    .img-drop-title { font-size: 0.8125rem; color: var(--text); margin: 0 0 0.2rem; }
+    .img-drop-hint { font-size: 0.72rem; color: var(--muted); margin: 0; }
+    .img-drop-preview {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      text-align: left;
+    }
+    .img-drop-preview img {
+      width: 3.5rem;
+      height: 3.5rem;
+      object-fit: cover;
+      border-radius: 0.45rem;
+      border: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .img-drop-preview-info {
+      flex: 1;
+      min-width: 0;
+      font-size: 0.75rem;
+      color: var(--muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .img-drop-clear {
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 0.75rem;
+      padding: 0.25rem 0.4rem;
+      border-radius: 0.35rem;
+    }
+    .img-drop-clear:hover { color: var(--err); background: rgba(248, 113, 113, 0.1); }
+    .img-aspect-row {
+      display: flex;
+      gap: 0.35rem;
+      flex-wrap: wrap;
+    }
+    .img-aspect-btn {
+      flex: 1 1 calc(33% - 0.35rem);
+      min-width: 4.5rem;
+      border: 1px solid var(--border);
+      background: var(--bg-elevated);
+      color: var(--muted);
+      border-radius: 0.55rem;
+      padding: 0.45rem 0.35rem;
+      font-size: 0.7rem;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.2rem;
+    }
+    .img-aspect-btn span:first-child { font-size: 1rem; line-height: 1; }
+    .img-aspect-btn.active {
+      border-color: var(--accent);
+      color: var(--text);
+      background: rgba(16, 163, 127, 0.1);
+    }
+    .images-advanced {
+      border: 1px solid var(--border);
+      border-radius: 0.65rem;
+      background: var(--bg-elevated);
+      overflow: hidden;
+    }
+    .images-advanced summary {
+      padding: 0.55rem 0.75rem;
+      font-size: 0.8125rem;
+      color: var(--muted);
+      cursor: pointer;
+      user-select: none;
+      list-style: none;
+    }
+    .images-advanced summary::-webkit-details-marker { display: none; }
+    .images-advanced[open] summary { border-bottom: 1px solid var(--border); color: var(--text); }
+    .images-advanced-body {
+      padding: 0.75rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.65rem;
+    }
+    .images-advanced-body label {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-bottom: 0.35rem;
+    }
+    .images-advanced-body select,
+    .images-advanced-body input[type="number"] {
+      width: 100%;
+      background: var(--bg-main);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      padding: 0.5rem 0.6rem;
+      font-size: 0.8125rem;
+    }
+    .images-advanced-body .full { grid-column: 1 / -1; }
+    .images-generate-btn {
+      width: 100%;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 0.75rem;
+      padding: 0.7rem 1rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: auto;
+      flex-shrink: 0;
+    }
+    .images-generate-btn:hover:not(:disabled) { background: var(--accent-hover); }
+    .images-generate-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .images-canvas {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      overflow: hidden;
+    }
+    .images-canvas-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.55rem 0.85rem;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.75rem;
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+    .images-canvas-bar strong { color: var(--text); font-weight: 500; }
+    #img-out {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .img-canvas-empty {
+      text-align: center;
+      max-width: 18rem;
+      color: var(--muted);
+    }
+    .img-canvas-empty-icon {
+      font-size: 2.5rem;
+      margin-bottom: 0.65rem;
+      opacity: 0.45;
+    }
+    .img-canvas-empty p { margin: 0.35rem 0 0; font-size: 0.8125rem; line-height: 1.45; }
+    .img-loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.75rem;
+      color: var(--muted);
+      font-size: 0.875rem;
+    }
+    .img-loading-spinner {
+      width: 2.25rem;
+      height: 2.25rem;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: img-spin 0.8s linear infinite;
+    }
+    @keyframes img-spin { to { transform: rotate(360deg); } }
+    .img-result-grid {
+      width: 100%;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      align-self: stretch;
+    }
+    .img-result-card {
+      background: var(--bg-main);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .img-result-card img {
+      width: 100%;
+      display: block;
+      aspect-ratio: 1;
+      object-fit: contain;
+      background: #1a1a1a;
+    }
+    .img-result-foot {
+      padding: 0.55rem 0.65rem;
+      display: flex;
+      gap: 0.35rem;
+      flex-wrap: wrap;
+      border-top: 1px solid var(--border);
+    }
+    .img-result-foot button {
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      font-size: 0.72rem;
+      padding: 0.3rem 0.55rem;
+      border-radius: 0.4rem;
+      cursor: pointer;
+    }
+    .img-result-foot button:hover { color: var(--text); border-color: #555; }
+    .img-revised-prompt {
+      font-size: 0.72rem;
+      color: var(--muted);
+      padding: 0.5rem 0.65rem 0;
+      line-height: 1.4;
+      grid-column: 1 / -1;
+    }
+    #img-meta { padding: 0 0.85rem 0.65rem; font-size: 0.7rem; color: var(--muted); }
+    #img-file, #img-mask { display: none; }
+    @media (max-width: 900px) {
+      .images-layout {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+        overflow-y: auto;
+      }
+      .images-canvas { min-height: 16rem; order: -1; }
+      .images-generate-btn { position: sticky; bottom: 0; z-index: 2; }
+    }
     .composer-area {
       padding: 0.75rem 1rem 1.25rem;
       background: linear-gradient(180deg, transparent, var(--bg-main) 20%);
@@ -645,6 +1031,37 @@
     }
     .send-btn:hover:not(:disabled) { opacity: 0.85; }
     .send-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .stop-btn {
+      width: 2rem;
+      height: 2rem;
+      border: none;
+      border-radius: 50%;
+      background: var(--err);
+      color: #fff;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 0.72rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .stop-btn:hover:not(:disabled) { opacity: 0.88; }
+    .stop-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .stop-btn[hidden] { display: none !important; }
+    .cancel-msg-btn {
+      margin-top: 0.55rem;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      border-radius: 0.45rem;
+      padding: 0.3rem 0.65rem;
+      font-size: 0.78rem;
+      cursor: pointer;
+    }
+    .cancel-msg-btn:hover { border-color: var(--err); color: var(--err); }
+    .cancel-msg-btn:disabled { opacity: 0.45; cursor: not-allowed; }
     .composer-meta {
       display: flex;
       align-items: center;
@@ -779,7 +1196,22 @@
           <div class="archive-list" id="archive-list" hidden></div>
         </div>
       </div>
+      <a
+        class="billing-widget"
+        id="billing-widget"
+        href="https://platform.openai.com/settings/organization/billing/overview"
+        target="_blank"
+        rel="noopener noreferrer"
+        title="Биллинг OpenAI"
+        hidden
+      >
+        <span class="billing-label">OpenAI · баланс</span>
+        <span class="billing-value" id="billing-value">—</span>
+        <span class="billing-sub" id="billing-sub"></span>
+      </a>
       <div class="sidebar-foot">
+        <button type="button" class="nav-item active" id="nav-chat">💬 Чат</button>
+        <button type="button" class="nav-item" id="nav-images">🖼 Изображения</button>
         <button type="button" class="nav-item" id="open-settings">⚙ Настройки</button>
       </div>
     </aside>
@@ -788,9 +1220,9 @@
       <header class="topbar">
         <div class="topbar-left">
           <button type="button" class="icon-btn" id="sidebar-toggle" title="Открыть меню" aria-label="Открыть меню">☰</button>
-          <button type="button" class="icon-btn" id="refresh" title="Обновить модели чата">↻</button>
+          <button type="button" class="icon-btn topbar-chat-only" id="refresh" title="Обновить модели чата">↻</button>
         </div>
-        <div class="model-picker" id="model-picker">
+        <div class="model-picker topbar-chat-only" id="model-picker">
           <button type="button" class="model-picker-trigger" id="model-trigger" aria-haspopup="listbox" aria-expanded="false" title="Выбрать модель">
             <span class="model-picker-label">
               <span class="model-picker-name" id="model-picker-name">Загрузка…</span>
@@ -809,7 +1241,7 @@
           </div>
           <select id="model" hidden aria-hidden="true" tabindex="-1"></select>
         </div>
-        <div class="topbar-right" id="topbar-chat-right">
+        <div class="topbar-right topbar-chat-only" id="topbar-chat-right">
           <div class="out-actions" id="out-actions">
             <button type="button" id="out-copy" title="Копировать">Копировать</button>
             <button type="button" id="out-export-txt" title="Скачать текст">TXT</button>
@@ -831,6 +1263,7 @@
             <div class="composer" id="composer">
               <button type="button" class="icon-btn" id="attach-btn" title="Прикрепить .md / .txt">📎</button>
               <textarea id="msg" rows="1" placeholder="Напишите сообщение…"></textarea>
+              <button type="button" class="stop-btn" id="stop" title="Остановить до отправки в OpenAI" hidden>■</button>
               <button type="button" class="send-btn" id="send" title="Отправить">↑</button>
             </div>
             <div class="composer-meta">
@@ -841,6 +1274,100 @@
           </div>
         </div>
         <input type="file" id="ctx-file" accept=".md,.markdown,.txt,.text,text/plain,text/markdown" />
+      </div>
+
+      <div id="panel-images" class="images-view" hidden>
+        <div class="images-layout">
+          <div class="images-controls">
+            <div class="images-header">
+              <h2>Изображения</h2>
+              <button type="button" id="img-refresh" title="Обновить список моделей">↻ Модели</button>
+            </div>
+
+            <div class="img-mode-tabs" role="tablist">
+              <button type="button" class="img-mode-tab active" id="img-mode-create" data-mode="create" role="tab" aria-selected="true">Создать</button>
+              <button type="button" class="img-mode-tab" id="img-mode-edit" data-mode="edit" role="tab" aria-selected="false">Редактировать</button>
+            </div>
+
+            <div class="images-field">
+              <label for="img-prompt">Описание</label>
+              <textarea id="img-prompt" placeholder="Опишите сцену, стиль и детали. Например: закат над морем, акварель, мягкий свет…"></textarea>
+            </div>
+
+            <div id="img-edit-section" class="images-field" hidden>
+              <label>Исходное изображение</label>
+              <div class="img-drop-zone" id="img-drop-zone">
+                <p class="img-drop-title">Перетащите файл или нажмите</p>
+                <p class="img-drop-hint">PNG, JPEG, WebP</p>
+              </div>
+              <input type="file" id="img-file" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" />
+              <div class="images-field" id="img-mask-section" style="margin-top:0.65rem">
+                <label>Маска PNG <span class="hint" style="display:inline;margin:0">(необязательно)</span></label>
+                <button type="button" class="img-drop-clear" id="img-mask-btn" style="border:1px solid var(--border);padding:0.4rem 0.65rem;width:100%;margin-bottom:0.35rem">Выбрать маску</button>
+                <span class="hint" id="img-mask-name"></span>
+                <input type="file" id="img-mask" accept="image/png,.png" />
+                <p class="hint">Прозрачные области маски — зона правки, остальное сохраняется.</p>
+              </div>
+            </div>
+
+            <div class="images-field">
+              <label for="img-model">Модель</label>
+              <select id="img-model"></select>
+              <p class="hint" id="img-model-hint"></p>
+            </div>
+
+            <div class="images-field" id="img-aspect-field">
+              <label>Пропорции</label>
+              <div class="img-aspect-row" id="img-aspect-row"></div>
+              <select id="img-size" hidden aria-hidden="true" tabindex="-1"></select>
+            </div>
+
+            <details class="images-advanced" id="img-advanced">
+              <summary>Дополнительные параметры</summary>
+              <div class="images-advanced-body">
+                <div>
+                  <label for="img-quality">Качество</label>
+                  <select id="img-quality"></select>
+                </div>
+                <div id="img-n-wrap">
+                  <label for="img-n">Количество</label>
+                  <input type="number" id="img-n" min="1" max="10" value="1" />
+                </div>
+                <div id="img-outfmt-wrap">
+                  <label for="img-outfmt">Формат</label>
+                  <select id="img-outfmt">
+                    <option value="png">png</option>
+                    <option value="jpeg">jpeg</option>
+                    <option value="webp">webp</option>
+                  </select>
+                </div>
+                <div id="img-fidelity-wrap">
+                  <label for="img-fidelity">input_fidelity</label>
+                  <select id="img-fidelity">
+                    <option value="low">low</option>
+                    <option value="high">high</option>
+                  </select>
+                </div>
+              </div>
+            </details>
+
+            <button type="button" class="images-generate-btn" id="img-send">Сгенерировать</button>
+          </div>
+
+          <div class="images-canvas">
+            <div class="images-canvas-bar">
+              <strong>Результат</strong>
+              <span id="img-canvas-status">Ожидание описания</span>
+            </div>
+            <div id="img-out">
+              <div class="img-canvas-empty">
+                <div class="img-canvas-empty-icon">🖼</div>
+                <p>Здесь появится изображение после генерации</p>
+              </div>
+            </div>
+            <div id="img-meta"></div>
+          </div>
+        </div>
       </div>
     </main>
   </div>
@@ -865,6 +1392,19 @@
         <span>Разрешить Pro для задач с рассуждением</span>
       </label>
       <p class="hint" id="routing-hint" style="margin:0 0 0.85rem">В режиме «Авто» сервер подбирает модель: mini для простых, GPT-5.5 или 4o для сложных, Pro — только если включено выше.</p>
+      <label for="billing-credit">Баланс OpenAI, $</label>
+      <input
+        type="number"
+        id="billing-credit"
+        min="0"
+        step="0.01"
+        placeholder="Скопируйте с billing/overview"
+        style="width:100%;margin:0.35rem 0 0.35rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:0.5rem;padding:0.55rem 0.65rem;"
+      />
+      <p class="hint" style="margin:0 0 0.85rem">
+        Вставьте актуальную сумму с billing/overview и нажмите «Сохранить» — это синхронизация.
+        Каждое сохранение сбрасывает отсчёт расхода. Нужен <code>OPENAI_ADMIN_API_KEY</code> в .env.
+      </p>
       <label for="system">Дополнительная инструкция (необязательно)</label>
       <input type="text" id="system" placeholder="Например: отвечай кратко и структурированно." />
       <p class="hint">По умолчанию модель отвечает на русском. Смените язык выше, если нужен другой.</p>
@@ -877,6 +1417,11 @@
 
   <script>
     const $ = (id) => document.getElementById(id);
+
+    function apiFetch(url, options) {
+      return fetch(url, { cache: "no-store", ...options });
+    }
+
     const modelSel = $("model");
     const modelPicker = $("model-picker");
     const modelPickerName = $("model-picker-name");
@@ -1001,7 +1546,7 @@
           .sort((a, b) => {
             const ka = modelSortKey(a.id);
             const kb = modelSortKey(b.id);
-            return ka[0] - kb[0] || ka[1].localeCompare(kb[1]);
+            return ka[0] - kb[0] || ka[1] - kb[1] || String(ka[2]).localeCompare(String(kb[2]));
           });
       });
       return buckets;
@@ -1048,7 +1593,26 @@
       modelSel.value = id;
       updateModelTrigger(id);
       renderModelPickerList(modelSearch.value.trim());
-      if (!silent) closeModelPicker();
+      if (!silent) {
+        closeModelPicker();
+        localStorage.setItem(MODEL_KEY, id);
+      }
+    }
+
+    function applyModelForSession(session) {
+      if (isRoutingAuto()) return;
+      const fromSession = session?.model;
+      const saved = localStorage.getItem(MODEL_KEY);
+      if (fromSession && chatModels.includes(fromSession)) {
+        setSelectedModel(fromSession, { silent: true });
+        localStorage.setItem(MODEL_KEY, fromSession);
+        return;
+      }
+      if (saved && chatModels.includes(saved)) {
+        setSelectedModel(saved, { silent: true });
+        return;
+      }
+      applyDefaultChatModel();
     }
 
     function renderModelPickerList(query) {
@@ -1123,13 +1687,22 @@
     let lastReply = null;
     let activeSessionId = null;
     let sessionMessages = [];
-    let pollTimer = null;
+    let lastHistoryFingerprint = "";
+    let liveSyncActive = false;
+    let liveSyncTimer = null;
+    let globalPendingCount = 0;
+    let lastBillingFetch = 0;
+    let clientRevision = null;
+    const SYNC_SLOW_MS = 4000;
+    const SYNC_FAST_MS = 1200;
+    const IS_LOCAL_HOST = location.hostname === "localhost" || location.hostname === "127.0.0.1";
     let archiveExpanded = false;
     let viewingArchived = false;
     const SESSION_KEY = "openai_local_chat_session_id";
     const REPLY_LANG_KEY = "openai_local_chat_reply_language";
     const ROUTING_MODE_KEY = "openai_local_chat_routing_mode";
     const ALLOW_PRO_KEY = "openai_local_chat_allow_pro";
+    const MODEL_KEY = "openai_local_chat_model";
 
     function isRoutingAuto() {
       return (localStorage.getItem(ROUTING_MODE_KEY) || "manual") === "auto";
@@ -1171,11 +1744,103 @@
       }
     }
 
-    function loadSettings() {
+    function fmtUsd(n) {
+      if (n == null || Number.isNaN(Number(n))) return "—";
+      return "$" + Number(n).toFixed(2);
+    }
+
+    function fmtBillingSync(ts) {
+      if (!ts) return "";
+      try {
+        return "синхр. " + new Date(ts * 1000).toLocaleString("ru-RU", {
+          day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+        });
+      } catch { return ""; }
+    }
+
+    function renderBilling(data) {
+      const widget = $("billing-widget");
+      const valueEl = $("billing-value");
+      const subEl = $("billing-sub");
+      widget.hidden = false;
+      widget.classList.remove("warn", "low");
+
+      if (data.configured && data.remaining_usd != null) {
+        valueEl.textContent = fmtUsd(data.remaining_usd);
+        const sync = fmtBillingSync(data.credit_set_at);
+        subEl.textContent =
+          (sync ? sync + " · " : "") +
+          "расход с синхр. " + fmtUsd(data.spent_since_credit_usd) +
+          " · сегодня " + fmtUsd(data.spent_today_usd);
+        if (data.remaining_usd < 5) widget.classList.add("low");
+        else if (data.remaining_usd < 20) widget.classList.add("warn");
+        return;
+      }
+      if (data.credit_saved && data.remaining_usd != null) {
+        valueEl.textContent = fmtUsd(data.remaining_usd);
+        subEl.textContent = data.hint || "Добавьте OPENAI_ADMIN_API_KEY для отслеживания расхода";
+        return;
+      }
+      if (data.usage_api) {
+        valueEl.textContent = "месяц " + fmtUsd(data.spent_month_usd);
+        subEl.textContent = "сегодня " + fmtUsd(data.spent_today_usd) + " · укажите баланс в настройках";
+        return;
+      }
+      valueEl.textContent = "настроить";
+      subEl.textContent = data.hint || "Admin-ключ и баланс в настройках";
+    }
+
+    async function loadBilling(force) {
+      const now = Date.now();
+      if (!force && now - lastBillingFetch < 60000) return;
+      lastBillingFetch = now;
+      try {
+        const r = await apiFetch("/api/billing");
+        const data = await r.json();
+        renderBilling(data);
+        if (data.credit_usd != null && document.activeElement !== $("billing-credit")) {
+          $("billing-credit").value = String(data.credit_usd);
+        }
+      } catch (_) {}
+    }
+
+    async function saveBillingCredit() {
+      const raw = $("billing-credit").value.trim();
+      if (!raw) return true;
+      const val = parseFloat(raw.replace(",", "."));
+      if (Number.isNaN(val) || val < 0) {
+        showToast("Некорректный баланс", "warn");
+        return false;
+      }
+      const r = await apiFetch("/api/billing/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ credit_usd: val }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        showToast(fmtDetail(data.detail, r.status), "error");
+        return false;
+      }
+      if (data.warning) showToast(data.warning, "warn", 8000);
+      else showToast("Баланс синхронизирован", "success", 3000);
+      lastBillingFetch = 0;
+      await loadBilling(true);
+      return true;
+    }
+
+    async function loadSettings() {
       $("reply-lang").value = localStorage.getItem(REPLY_LANG_KEY) || "ru";
       $("routing-mode").value = localStorage.getItem(ROUTING_MODE_KEY) || "manual";
       $("allow-pro").checked = localStorage.getItem(ALLOW_PRO_KEY) === "1";
       $("allow-pro-wrap").style.display = $("routing-mode").value === "auto" ? "flex" : "none";
+      try {
+        const r = await apiFetch("/api/billing");
+        if (r.ok) {
+          const data = await r.json();
+          if (data.credit_usd != null) $("billing-credit").value = String(data.credit_usd);
+        }
+      } catch (_) {}
     }
 
     function saveSettings() {
@@ -1196,12 +1861,80 @@
       return cyr / letters.length >= 0.35;
     }
 
+    function parseTokenInt(raw) {
+      if (!raw) return null;
+      const n = parseInt(String(raw).replace(/[,_]/g, ""), 10);
+      return Number.isFinite(n) ? n : null;
+    }
+
+    function fmtTokenCount(n) {
+      if (n == null) return "—";
+      return n.toLocaleString("ru-RU") + " токенов";
+    }
+
+    function extractTokenLimitInfo(text) {
+      const raw = String(text || "");
+      const low = raw.toLowerCase();
+      let limit = null;
+      let actual = null;
+      const limitPatterns = [
+        /maximum context length (?:is|of) ([\d,_]+)/i,
+        /maximum context (?:window )?(?:is|of) ([\d,_]+)/i,
+        /context window (?:is|of) ([\d,_]+)/i,
+        /configured limit of ([\d,_]+)\s*tokens?/i,
+        /maximum (?:of )?([\d,_]+)\s*tokens?/i,
+      ];
+      for (const pat of limitPatterns) {
+        const m = raw.match(pat);
+        if (m) { limit = parseTokenInt(m[1]); break; }
+      }
+      const actualPatterns = [
+        /your messages resulted in ([\d,_]+)\s*tokens?/i,
+        /messages resulted in ([\d,_]+)\s*tokens?/i,
+        /you requested ([\d,_]+)\s*tokens?/i,
+        /requested ([\d,_]+)\s*tokens?/i,
+        /resulted in ([\d,_]+)\s*tokens?/i,
+        /([\d,_]+)\s*tokens?\s+in your (?:messages|input|prompt)/i,
+      ];
+      for (const pat of actualPatterns) {
+        const m = raw.match(pat);
+        if (m) { actual = parseTokenInt(m[1]); break; }
+      }
+      const tpm = raw.match(/(?:limit|tpm)\s*[:\s]*([\d,_]+)\s*[,;]?\s*(?:requested|used)\s*[:\s]*([\d,_]+)/i);
+      if (tpm) return { kind: "tpm", limit: parseTokenInt(tpm[1]), actual: parseTokenInt(tpm[2]) };
+      const isContext = ["maximum context length", "context length exceeded", "context_length_exceeded", "context window", "context_length"].some((x) => low.includes(x));
+      const isTpm = low.includes("tpm") || low.includes("tokens per min") || (low.includes("request too large") && low.includes("token"));
+      if (isContext && (limit != null || actual != null)) return { kind: "context", limit, actual };
+      if (isTpm && (limit != null || actual != null)) return { kind: "tpm", limit, actual };
+      if ((limit != null || actual != null) && ["too large", "too long", "exceeds", "maximum"].some((x) => low.includes(x))) {
+        return { kind: "size", limit, actual };
+      }
+      return null;
+    }
+
+    function messageForTokenLimit(info) {
+      const parts = [];
+      if (info.limit != null) parts.push("лимит: " + fmtTokenCount(info.limit));
+      if (info.actual != null) parts.push("получилось: " + fmtTokenCount(info.actual));
+      const stats = parts.length ? " (" + parts.join(", ") + ")" : "";
+      if (info.kind === "tpm") {
+        return "Запрос слишком большой для лимита токенов в минуту (TPM)" + stats + ". Сократите сообщение, уберите файл или подождите минуту.";
+      }
+      if (info.kind === "size") {
+        return "Файл или запрос слишком большой" + stats + ". Уменьшите размер и повторите.";
+      }
+      return "Сообщение не помещается в контекст выбранной модели" + stats + ". Сократите текст, уменьшите файл или начните новый чат.";
+    }
+
     function localizeErrorText(text) {
       if (!text || !String(text).trim()) {
         return "Произошла неизвестная ошибка. Повторите запрос.";
       }
       const raw = String(text).trim();
       if (looksRussian(raw)) return raw;
+
+      const tokenInfo = extractTokenLimitInfo(raw);
+      if (tokenInfo) return messageForTokenLimit(tokenInfo);
 
       const low = raw.toLowerCase();
       const has = (...p) => p.every((x) => low.includes(x));
@@ -1453,6 +2186,21 @@
       ta.style.height = Math.min(ta.scrollHeight, 200) + "px";
     }
 
+    function setView(view) {
+      const chat = view === "chat";
+      $("panel-chat").hidden = !chat;
+      $("panel-images").hidden = chat;
+      $("panel-chat").setAttribute("aria-hidden", chat ? "false" : "true");
+      $("panel-images").setAttribute("aria-hidden", chat ? "true" : "false");
+      $("nav-chat").classList.toggle("active", chat);
+      $("nav-images").classList.toggle("active", !chat);
+      document.querySelectorAll(".topbar-chat-only").forEach((el) => {
+        el.classList.toggle("hidden", !chat);
+      });
+      closeSidebarMobile();
+      closeModelPicker();
+    }
+
     function closeSidebarMobile() {
       $("sidebar").classList.remove("open");
       $("sidebar-overlay").classList.remove("show");
@@ -1475,8 +2223,10 @@
       closeSidebarMobile();
     });
     $("settings-close").addEventListener("click", () => $("settings-modal").classList.remove("show"));
-    $("settings-save").addEventListener("click", () => {
+    $("settings-save").addEventListener("click", async () => {
       saveSettings();
+      const billingOk = await saveBillingCredit();
+      if (!billingOk) return;
       $("settings-modal").classList.remove("show");
       showToast("Настройки сохранены", "success");
     });
@@ -1497,6 +2247,72 @@
       );
     }
 
+    function activePendingMessage(msgs) {
+      const list = msgs || sessionMessages;
+      for (let i = list.length - 1; i >= 0; i--) {
+        const m = list[i];
+        if (m.role === "assistant" && (m.status === "pending" || m.status === "running")) {
+          return m;
+        }
+      }
+      return null;
+    }
+
+    function updateComposerPendingState(messages) {
+      const pending = activePendingMessage(messages);
+      const stopBtn = $("stop");
+      const sendBtn = $("send");
+      if (viewingArchived) {
+        stopBtn.hidden = true;
+        sendBtn.hidden = false;
+        sendBtn.disabled = true;
+        return;
+      }
+      if (pending) {
+        stopBtn.hidden = false;
+        stopBtn.disabled = false;
+        stopBtn.dataset.messageId = pending.id;
+        sendBtn.hidden = true;
+      } else {
+        stopBtn.hidden = true;
+        stopBtn.disabled = false;
+        delete stopBtn.dataset.messageId;
+        sendBtn.hidden = false;
+        sendBtn.disabled = viewingArchived;
+      }
+    }
+
+    async function cancelMessage(messageId) {
+      if (!messageId) return;
+      const stopBtn = $("stop");
+      stopBtn.disabled = true;
+      document.querySelectorAll(".cancel-msg-btn").forEach((b) => { b.disabled = true; });
+      try {
+        const r = await apiFetch("/api/messages/" + encodeURIComponent(messageId) + "/cancel", {
+          method: "POST",
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          showToast(fmtDetail(data.detail ?? data.message, r.status), r.status === 409 ? "warn" : "error");
+          return;
+        }
+        if (data.already_processing) {
+          showToast(data.message || "Запрос уже у OpenAI — ответ появится в чате.", "info", 6000);
+          scheduleLiveSync(SYNC_FAST_MS);
+          return;
+        }
+        showToast("Запрос остановлен", "success");
+        scheduleLiveSync(SYNC_FAST_MS);
+        await loadSession(0, { syncModel: false });
+        await loadSessionList();
+      } catch (e) {
+        showToast(humanizeClientError(e), "error");
+      } finally {
+        updateComposerPendingState(sessionMessages);
+        document.querySelectorAll(".cancel-msg-btn").forEach((b) => { b.disabled = false; });
+      }
+    }
+
     function formatTs(ts) {
       if (!ts) return "";
       try { return new Date(ts * 1000).toLocaleString("ru-RU"); } catch { return ""; }
@@ -1504,22 +2320,49 @@
 
     function pendingLabel(model, status) {
       const base = status === "running" ? "Печатает" : "В очереди";
+      const stopHint = status === "pending"
+        ? " · ■ остановит до отправки в OpenAI"
+        : " · после отправки ответ появится в чате";
       if (isRoutingAuto()) {
-        const suffix = isProModel(model) ? " · Pro может считать до 2 ч" : " · можно закрыть вкладку";
-        return base + " · Авто" + suffix;
+        const suffix = isProModel(model) ? " · Pro может считать до 2 ч" : "";
+        return base + " · Авто" + suffix + stopHint;
       }
-      if (isProModel(model)) return base + " · Pro может считать до 2 ч";
-      return base + " · можно закрыть вкладку";
+      if (isProModel(model)) return base + " · Pro может считать до 2 ч" + stopHint;
+      return base + stopHint;
     }
 
-    function renderHistory(messages) {
+    function historyFingerprint(messages) {
+      return (messages || []).map((m) =>
+        [m.id, m.role, m.status, m.content || "", m.attachment_name || ""].join("\x1f")
+      ).join("\x1e");
+    }
+
+    function isNearChatBottom(scrollEl, thresholdPx = 120) {
+      if (!scrollEl) return true;
+      return scrollEl.scrollHeight - scrollEl.clientHeight - scrollEl.scrollTop <= thresholdPx;
+    }
+
+    function renderHistory(messages, { scrollToBottom = false } = {}) {
       const el = $("chat-history");
+      const scroll = el.closest(".messages-scroll");
+      const fp = historyFingerprint(messages);
+
       if (!messages.length) {
+        lastHistoryFingerprint = "";
         el.innerHTML = '<div class="empty-state"><h2>Чем могу помочь?</h2></div>';
         clearLastReply();
         $("meta").textContent = "";
+        updateComposerPendingState(messages);
         return;
       }
+
+      if (fp === lastHistoryFingerprint && !scrollToBottom) {
+        updateComposerPendingState(messages);
+        return;
+      }
+      lastHistoryFingerprint = fp;
+
+      const stickToBottom = scrollToBottom || isNearChatBottom(scroll);
 
       el.innerHTML = messages.map((m) => {
         if (m.role === "user") {
@@ -1539,7 +2382,17 @@
             '<div class="turn assistant-turn"><div class="turn-inner" style="max-width:100%">' +
             '<div class="avatar bot-av">AI</div>' +
             '<div class="assistant-body"><div class="typing"><span></span><span></span><span></span></div>' +
-            '<div class="hint" style="margin-top:0.5rem">' + escapeHtml(pendingLabel(m.model, m.status)) + "</div></div></div></div>"
+            '<div class="hint" style="margin-top:0.5rem">' + escapeHtml(pendingLabel(m.model, m.status)) + "</div>" +
+            '<button type="button" class="cancel-msg-btn" data-message-id="' + escapeHtml(m.id) + '">Остановить</button>' +
+            "</div></div></div>"
+          );
+        }
+        if (m.status === "cancelled") {
+          return (
+            '<div class="turn assistant-turn"><div class="turn-inner" style="max-width:100%">' +
+            '<div class="avatar bot-av">—</div>' +
+            '<div class="assistant-body bubble" style="color:var(--muted)">' +
+            escapeHtml(m.content || "Запрос остановлен.") + "</div></div></div>"
           );
         }
         if (m.status === "failed") {
@@ -1556,8 +2409,7 @@
         );
       }).join("");
 
-      const scroll = el.closest(".messages-scroll");
-      if (scroll) scroll.scrollTop = scroll.scrollHeight;
+      if (scroll && stickToBottom) scroll.scrollTop = scroll.scrollHeight;
 
       const assistants = messages.filter((m) => m.role === "assistant" && m.status === "completed");
       const last = assistants[assistants.length - 1];
@@ -1571,13 +2423,71 @@
         clearLastReply();
         $("meta").textContent = hasPendingMessages(messages) ? "Ответ готовится на сервере…" : "";
       }
+      updateComposerPendingState(messages);
     }
+
+    function liveSyncDelay() {
+      return (hasPendingMessages(sessionMessages) || globalPendingCount > 0) ? SYNC_FAST_MS : SYNC_SLOW_MS;
+    }
+
+    function scheduleLiveSync(delayMs) {
+      clearTimeout(liveSyncTimer);
+      liveSyncTimer = setTimeout(async () => {
+        if (!liveSyncActive) return;
+        await liveSyncTick();
+        scheduleLiveSync();
+      }, delayMs ?? liveSyncDelay());
+    }
+
+    function startLiveSync() {
+      if (liveSyncActive) return;
+      liveSyncActive = true;
+      scheduleLiveSync(0);
+    }
+
+    async function liveSyncTick() {
+      try {
+        const pr = await apiFetch("/api/jobs/pending");
+        if (pr.ok) {
+          const pdata = await pr.json();
+          globalPendingCount = pdata.count || 0;
+        }
+      } catch (_) {}
+
+      if (IS_LOCAL_HOST) {
+        try {
+          const rr = await apiFetch("/api/client-revision");
+          if (rr.ok) {
+            const rev = (await rr.json()).revision;
+            if (clientRevision == null) clientRevision = rev;
+            else if (clientRevision !== rev) {
+              location.reload();
+              return;
+            }
+          }
+        } catch (_) {}
+      }
+
+      await loadSessionList().catch(() => {});
+      if (activeSessionId) await loadSession(0, { syncModel: false }).catch(() => {});
+      await loadBilling(false);
+    }
+
+    async function refreshOnFocus() {
+      if (!liveSyncActive) startLiveSync();
+      await liveSyncTick();
+    }
+
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) refreshOnFocus();
+    });
+    window.addEventListener("focus", refreshOnFocus);
 
     async function loadSessionList() {
       try {
         const [activeR, archR] = await Promise.all([
-          fetch("/api/sessions"),
-          fetch("/api/sessions/archived/list"),
+          apiFetch("/api/sessions"),
+          apiFetch("/api/sessions/archived/list"),
         ]);
         const activeData = await activeR.json();
         const archData = await archR.json();
@@ -1605,16 +2515,16 @@
     }
 
     async function switchSession(id) {
-      stopPolling();
       activeSessionId = id;
       localStorage.setItem(SESSION_KEY, id);
+      lastHistoryFingerprint = "";
       closeSidebarMobile();
-      await loadSession();
+      await loadSession(0, { syncModel: true, scrollToBottom: true });
       await loadSessionList();
     }
 
     async function createSession() {
-      const r = await fetch("/api/sessions", {
+      const r = await apiFetch("/api/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: "{}",
@@ -1634,7 +2544,7 @@
       let sid = localStorage.getItem(SESSION_KEY);
       if (sid) {
         try {
-          const r = await fetch("/api/sessions/" + encodeURIComponent(sid));
+          const r = await apiFetch("/api/sessions/" + encodeURIComponent(sid));
           if (r.ok) {
             const data = await r.json();
             if (!data.session?.archived_at) {
@@ -1647,43 +2557,25 @@
       return createSession();
     }
 
-    async function loadSession(depth = 0) {
+    async function loadSession(depth = 0, { syncModel = false, scrollToBottom = false } = {}) {
       if (!activeSessionId) await ensureSession();
-      const r = await fetch("/api/sessions/" + encodeURIComponent(activeSessionId));
+      const r = await apiFetch("/api/sessions/" + encodeURIComponent(activeSessionId));
       if (!r.ok) {
         if (depth >= 2) throw new Error("Не удалось загрузить чат (сессия не найдена)");
         localStorage.removeItem(SESSION_KEY);
         activeSessionId = null;
         await ensureSession();
-        return loadSession(depth + 1);
+        return loadSession(depth + 1, { syncModel, scrollToBottom });
       }
       const data = await r.json();
       sessionMessages = data.messages || [];
       setArchivedView(!!data.session?.archived_at);
       if (data.session?.system && !$("system").value.trim()) $("system").value = data.session.system;
-      if (data.session?.model && chatModels.includes(data.session.model)) {
-        setSelectedModel(data.session.model, { silent: true });
-      } else {
-        applyDefaultChatModel();
-      }
-      renderHistory(sessionMessages);
-      if (hasPendingMessages(sessionMessages)) startPolling();
-      else stopPolling();
-    }
-
-    function startPolling() {
-      if (pollTimer) return;
-      pollTimer = setInterval(() => { loadSession(); loadSessionList(); }, 2000);
-    }
-
-    function stopPolling() {
-      if (!pollTimer) return;
-      clearInterval(pollTimer);
-      pollTimer = null;
+      if (syncModel) applyModelForSession(data.session);
+      renderHistory(sessionMessages, { scrollToBottom: scrollToBottom || syncModel });
     }
 
     async function newChat() {
-      stopPolling();
       try {
         await createSession();
         sessionMessages = [];
@@ -1693,8 +2585,13 @@
         $("ctx-file").value = "";
         setCtxAttachment(null, null);
         setArchivedView(false);
-        applyDefaultChatModel();
-        renderHistory([]);
+        if (!isRoutingAuto()) {
+          const saved = localStorage.getItem(MODEL_KEY);
+          if (saved && chatModels.includes(saved)) setSelectedModel(saved, { silent: true });
+          else applyDefaultChatModel();
+        }
+        lastHistoryFingerprint = "";
+        renderHistory([], { scrollToBottom: true });
         await loadSessionList();
         closeSidebarMobile();
         $("msg").focus();
@@ -1818,7 +2715,7 @@
     $("ctx-file-clear").addEventListener("click", () => { $("ctx-file").value = ""; setCtxAttachment(null, null); });
 
     async function loadModels(manual) {
-      const prev = modelSel.value;
+      const prev = modelSel.value || localStorage.getItem(MODEL_KEY) || "";
       modelPickerName.textContent = "Загрузка…";
       modelPickerHint.textContent = "Получаем список OpenAI";
       $("model-trigger").disabled = true;
@@ -1867,7 +2764,7 @@
 
       try {
         await ensureSession();
-        const r = await fetch("/api/sessions/" + encodeURIComponent(activeSessionId) + "/messages", {
+        const r = await apiFetch("/api/sessions/" + encodeURIComponent(activeSessionId) + "/messages", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -1881,18 +2778,28 @@
         autoResizeMsg();
         $("ctx-file").value = "";
         setCtxAttachment(null, null);
-        showToast("Запрос на сервере — можно закрыть вкладку", "info", 6000);
-        await loadSession();
+        showToast("Запрос на сервере — ответ появится автоматически", "info", 6000);
+        await loadSession(0, { syncModel: false, scrollToBottom: true });
         await loadSessionList();
-        startPolling();
+        scheduleLiveSync(SYNC_FAST_MS);
       } catch (e) {
         showToast(humanizeClientError(e), "error");
       } finally {
-        btn.disabled = false;
+        updateComposerPendingState(sessionMessages);
       }
     }
 
     $("send").addEventListener("click", sendChat);
+    $("stop").addEventListener("click", () => {
+      const id = $("stop").dataset.messageId;
+      if (id) cancelMessage(id);
+    });
+    $("chat-history").addEventListener("click", (e) => {
+      const btn = e.target.closest(".cancel-msg-btn");
+      if (!btn) return;
+      const id = btn.dataset.messageId;
+      if (id) cancelMessage(id);
+    });
     $("refresh").addEventListener("click", () => loadModels(true));
     $("model-trigger").addEventListener("click", (e) => {
       e.stopPropagation();
@@ -1923,17 +2830,388 @@
 
     function safeStringify(obj) { try { return JSON.stringify(obj); } catch { return String(obj); } }
 
+    /* —— изображения —— */
+    const imgModelSel = $("img-model");
+    const imgSizeSel = $("img-size");
+    const imgQualitySel = $("img-quality");
+    let imgMode = "create";
+    let imgFileObjectUrl = null;
+
+    const IMG_MODEL_HINTS = {
+      "gpt-image-2": "Новейшая модель · создание и редактирование",
+      "gpt-image-1.5": "Лучшее качество · создание и редактирование с маской",
+      "gpt-image-1": "Универсальная генерация и правка изображений",
+      "gpt-image-1-mini": "Быстрее и дешевле · без input_fidelity",
+      "dall-e-3": "Только создание с нуля · без исходного файла",
+      "dall-e-2": "Классическая генерация · поддержка вариаций",
+    };
+
+    const IMG_ASPECT_PRESETS = {
+      gpt: [
+        { value: "auto", icon: "◇", label: "auto" },
+        { value: "1024x1024", icon: "□", label: "1:1" },
+        { value: "1536x1024", icon: "▭", label: "3:2" },
+        { value: "1024x1536", icon: "▯", label: "2:3" },
+      ],
+      dalle3: [
+        { value: "1024x1024", icon: "□", label: "1:1" },
+        { value: "1792x1024", icon: "▭", label: "широкий" },
+        { value: "1024x1792", icon: "▯", label: "высокий" },
+      ],
+      dalle2: [
+        { value: "256x256", icon: "□", label: "256" },
+        { value: "512x512", icon: "□", label: "512" },
+        { value: "1024x1024", icon: "□", label: "1024" },
+      ],
+    };
+
+    function mimeFromFmt(fmt) {
+      if (fmt === "jpeg") return "image/jpeg";
+      if (fmt === "webp") return "image/webp";
+      return "image/png";
+    }
+
+    function currentImageModelId() { return (imgModelSel.value || "").trim().toLowerCase(); }
+
+    function imageModelFamily(mid) {
+      if (mid.startsWith("dall-e-3")) return "dalle3";
+      if (mid.startsWith("dall-e-2")) return "dalle2";
+      return "gpt";
+    }
+
+    function fillSizeOptions() {
+      const family = imageModelFamily(currentImageModelId());
+      const presets = IMG_ASPECT_PRESETS[family];
+      const prev = imgSizeSel.value;
+      imgSizeSel.innerHTML = "";
+      presets.forEach((p) => {
+        const o = document.createElement("option");
+        o.value = p.value;
+        o.textContent = p.value;
+        imgSizeSel.appendChild(o);
+      });
+      if (presets.some((p) => p.value === prev)) imgSizeSel.value = prev;
+      else imgSizeSel.value = presets[0].value;
+      renderAspectButtons();
+    }
+
+    function renderAspectButtons() {
+      const family = imageModelFamily(currentImageModelId());
+      const presets = IMG_ASPECT_PRESETS[family];
+      const row = $("img-aspect-row");
+      const selected = imgSizeSel.value;
+      row.innerHTML = "";
+      presets.forEach((p) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "img-aspect-btn" + (p.value === selected ? " active" : "");
+        btn.innerHTML = "<span>" + p.icon + "</span><span>" + escapeHtml(p.label) + "</span>";
+        btn.addEventListener("click", () => {
+          imgSizeSel.value = p.value;
+          renderAspectButtons();
+        });
+        row.appendChild(btn);
+      });
+    }
+
+    function fillQualityOptions() {
+      const mid = currentImageModelId();
+      const opts = mid.startsWith("dall-e-3") ? [["standard", "standard"], ["hd", "hd"]]
+        : mid.startsWith("dall-e-2") ? [["standard", "standard"]]
+        : [["auto", "auto"], ["low", "low"], ["medium", "medium"], ["high", "high"]];
+      const prev = imgQualitySel.value;
+      imgQualitySel.innerHTML = "";
+      opts.forEach(([v, l]) => {
+        const o = document.createElement("option");
+        o.value = v;
+        o.textContent = l;
+        imgQualitySel.appendChild(o);
+      });
+      if (opts.some(([v]) => v === prev)) imgQualitySel.value = prev;
+    }
+
+    function updateImageModelHint() {
+      const mid = currentImageModelId();
+      $("img-model-hint").textContent = IMG_MODEL_HINTS[mid] || "Модель OpenAI для генерации изображений";
+      const isDalle3 = mid.startsWith("dall-e-3");
+      const isGptImage = mid.includes("gpt-image");
+      const isMini = mid.includes("mini");
+      $("img-outfmt-wrap").hidden = !isGptImage;
+      $("img-fidelity-wrap").hidden = !(isGptImage && !isMini);
+      $("img-n-wrap").hidden = isDalle3;
+      $("img-n").disabled = isDalle3;
+      if (isDalle3 && imgMode === "edit") setImgMode("create");
+      $("img-mode-edit").disabled = isDalle3;
+      $("img-mode-edit").title = isDalle3 ? "DALL·E 3 не поддерживает редактирование" : "";
+      $("img-send").textContent = imgMode === "edit" ? "Применить правки" : "Сгенерировать";
+      $("img-prompt").placeholder = imgMode === "edit"
+        ? "Что изменить на изображении? Например: заменить фон на горы, добавить солнце…"
+        : "Опишите сцену, стиль и детали. Например: закат над морем, акварель, мягкий свет…";
+    }
+
+    function setImgMode(mode) {
+      imgMode = mode;
+      $("img-mode-create").classList.toggle("active", mode === "create");
+      $("img-mode-edit").classList.toggle("active", mode === "edit");
+      $("img-mode-create").setAttribute("aria-selected", mode === "create" ? "true" : "false");
+      $("img-mode-edit").setAttribute("aria-selected", mode === "edit" ? "true" : "false");
+      $("img-edit-section").hidden = mode !== "edit";
+      updateImageModelHint();
+      if (mode === "create") clearImgFile();
+    }
+
+    function showImgLoading() {
+      $("img-canvas-status").textContent = "Генерация…";
+      $("img-out").innerHTML =
+        '<div class="img-loading"><div class="img-loading-spinner"></div><p>Создаём изображение…</p></div>';
+    }
+
+    function renderImgDropZone(file) {
+      const zone = $("img-drop-zone");
+      if (!file) {
+        zone.classList.remove("has-file");
+        zone.innerHTML = '<p class="img-drop-title">Перетащите файл или нажмите</p><p class="img-drop-hint">PNG, JPEG, WebP</p>';
+        return;
+      }
+      if (imgFileObjectUrl) URL.revokeObjectURL(imgFileObjectUrl);
+      imgFileObjectUrl = URL.createObjectURL(file);
+      zone.classList.add("has-file");
+      zone.innerHTML =
+        '<div class="img-drop-preview">' +
+        '<img src="' + imgFileObjectUrl + '" alt="" />' +
+        '<span class="img-drop-preview-info">' + escapeHtml(file.name) + "</span>" +
+        '<button type="button" class="img-drop-clear" id="img-file-clear-btn">Убрать</button></div>';
+      $("img-file-clear-btn").addEventListener("click", (e) => {
+        e.stopPropagation();
+        clearImgFile();
+      });
+    }
+
+    function clearImgFile() {
+      $("img-file").value = "";
+      if (imgFileObjectUrl) { URL.revokeObjectURL(imgFileObjectUrl); imgFileObjectUrl = null; }
+      renderImgDropZone(null);
+    }
+
+    function onImgFileSelected(file) {
+      if (!file) { clearImgFile(); return; }
+      renderImgDropZone(file);
+    }
+
+    function downloadDataUrl(dataUrl, filename) {
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = filename;
+      a.click();
+    }
+
+    function renderImageResult(data) {
+      const images = data.images || [];
+      $("img-canvas-status").textContent = images.length ? "Готово · " + images.length + " шт." : "Пустой ответ";
+      const el = $("img-out");
+      el.innerHTML = "";
+      if (!images.length) {
+        el.innerHTML = '<span class="err">Модель не вернула изображение. Попробуйте другое описание.</span>';
+        return;
+      }
+      const grid = document.createElement("div");
+      grid.className = "img-result-grid";
+      const ext = (data.output_format || "png").replace("jpeg", "jpg");
+      images.forEach((im, idx) => {
+        if (im.revised_prompt && idx === 0) {
+          const rp = document.createElement("p");
+          rp.className = "img-revised-prompt";
+          rp.textContent = "Уточнённое описание: " + im.revised_prompt;
+          grid.appendChild(rp);
+        }
+        const src = im.b64_json
+          ? "data:" + mimeFromFmt(data.output_format) + ";base64," + im.b64_json
+          : im.url;
+        const card = document.createElement("div");
+        card.className = "img-result-card";
+        const img = document.createElement("img");
+        img.src = src;
+        img.alt = "Результат " + (idx + 1);
+        const foot = document.createElement("div");
+        foot.className = "img-result-foot";
+        const dl = document.createElement("button");
+        dl.type = "button";
+        dl.textContent = "Скачать";
+        const fname = "openai-image-" + (data.model || "img").replace(/[^\w.-]+/g, "_") + "-" + (idx + 1) + "." + ext;
+        dl.addEventListener("click", () => downloadDataUrl(src, fname));
+        foot.appendChild(dl);
+        if (navigator.clipboard && im.b64_json) {
+          const cp = document.createElement("button");
+          cp.type = "button";
+          cp.textContent = "Копировать";
+          cp.addEventListener("click", async () => {
+            try {
+              const res = await fetch(src);
+              const blob = await res.blob();
+              await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+              showToast("Изображение в буфере", "success", 2500);
+            } catch (e) { showToast(humanizeClientError(e), "error"); }
+          });
+          foot.appendChild(cp);
+        }
+        card.appendChild(img);
+        card.appendChild(foot);
+        grid.appendChild(card);
+      });
+      el.appendChild(grid);
+      const metaParts = [];
+      if (data.model) metaParts.push(data.model);
+      if (data.api) metaParts.push(apiLabel(data.api));
+      if (data.size) metaParts.push(data.size);
+      $("img-meta").textContent = metaParts.join(" · ");
+    }
+
+    function onImageModelChange() {
+      fillSizeOptions();
+      fillQualityOptions();
+      updateImageModelHint();
+    }
+
+    imgModelSel.addEventListener("change", onImageModelChange);
+
+    async function loadImageModels(manual) {
+      imgModelSel.innerHTML = "<option>Загрузка…</option>";
+      imgModelSel.disabled = true;
+      try {
+        const r = await fetch("/api/image-models");
+        const data = await r.json();
+        imgModelSel.innerHTML = "";
+        (data.models || []).forEach((id) => {
+          const o = document.createElement("option");
+          o.value = id;
+          o.textContent = id;
+          imgModelSel.appendChild(o);
+        });
+        const prefer = ["gpt-image-2", "gpt-image-1.5", "gpt-image-1", "dall-e-3"];
+        const pick = prefer.find((id) => (data.models || []).includes(id)) || data.models?.[0];
+        if (pick) imgModelSel.value = pick;
+        onImageModelChange();
+        if (data.warning) showToast("Кэш моделей изображений: " + data.warning, "warn", 7000);
+        else if (manual) showToast("Список моделей изображений обновлён", "success", 2500);
+      } catch (e) {
+        showToast(humanizeClientError(e), "error");
+      } finally {
+        imgModelSel.disabled = false;
+      }
+    }
+
+    async function sendImages() {
+      const model = imgModelSel.value?.trim();
+      const prompt = $("img-prompt").value?.trim();
+      const file = $("img-file").files?.[0];
+      if (!model) { showToast("Выберите модель изображений", "warn"); return; }
+      if (!prompt) { showToast("Введите описание изображения", "warn"); return; }
+      if (imgMode === "edit" && !file) {
+        showToast("В режиме «Редактировать» нужно загрузить исходное изображение", "warn");
+        return;
+      }
+      if (file && model.toLowerCase().startsWith("dall-e-3")) {
+        showToast("DALL·E 3 не поддерживает исходный файл — переключитесь на gpt-image", "warn");
+        return;
+      }
+      $("img-send").disabled = true;
+      showImgLoading();
+      try {
+        let r;
+        const useEdit = imgMode === "edit" && file;
+        if (useEdit) {
+          const fd = new FormData();
+          fd.append("prompt", prompt);
+          fd.append("model", model);
+          fd.append("size", imgSizeSel.value);
+          fd.append("quality", imgQualitySel.value);
+          fd.append("input_fidelity", $("img-fidelity").value);
+          fd.append("n", String(parseInt($("img-n").value, 10) || 1));
+          fd.append("image", file);
+          if ($("img-mask").files?.[0]) fd.append("mask", $("img-mask").files[0]);
+          fd.append("output_format", $("img-outfmt").value || "png");
+          r = await fetch("/api/images/edit", { method: "POST", body: fd });
+        } else {
+          const body = {
+            model, prompt, size: imgSizeSel.value, quality: imgQualitySel.value,
+            n: parseInt($("img-n").value, 10) || 1,
+          };
+          if (currentImageModelId().includes("gpt-image")) {
+            body.output_format = $("img-outfmt").value || "png";
+          }
+          r = await fetch("/api/images/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+        }
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          const errText = fmtDetail(data.detail, r.status);
+          $("img-canvas-status").textContent = "Ошибка";
+          $("img-out").innerHTML = '<span class="err">' + escapeHtml(errText) + "</span>";
+          showToast(errText, "error");
+        } else {
+          renderImageResult(data);
+          const n = (data.images || []).length;
+          showToast(n > 1 ? "Изображения готовы" : "Изображение готово", "success", 2500);
+        }
+      } catch (e) {
+        const errText = humanizeClientError(e);
+        $("img-canvas-status").textContent = "Ошибка";
+        $("img-out").innerHTML = '<span class="err">' + escapeHtml(errText) + "</span>";
+        showToast(errText, "error");
+      } finally {
+        $("img-send").disabled = false;
+      }
+    }
+
+    $("nav-chat").addEventListener("click", () => setView("chat"));
+    $("nav-images").addEventListener("click", () => setView("images"));
+    $("img-send").addEventListener("click", sendImages);
+    $("img-refresh").addEventListener("click", () => loadImageModels(true));
+    $("img-mode-create").addEventListener("click", () => setImgMode("create"));
+    $("img-mode-edit").addEventListener("click", () => setImgMode("edit"));
+    $("img-drop-zone").addEventListener("click", () => {
+      if (!$("img-drop-zone").classList.contains("has-file")) $("img-file").click();
+    });
+    $("img-file").addEventListener("change", () => onImgFileSelected($("img-file").files?.[0] || null));
+    $("img-drop-zone").addEventListener("dragover", (e) => { e.preventDefault(); $("img-drop-zone").classList.add("dragover"); });
+    $("img-drop-zone").addEventListener("dragleave", () => $("img-drop-zone").classList.remove("dragover"));
+    $("img-drop-zone").addEventListener("drop", (e) => {
+      e.preventDefault();
+      $("img-drop-zone").classList.remove("dragover");
+      const file = e.dataTransfer?.files?.[0];
+      if (!file) return;
+      if (!file.type.startsWith("image/")) { showToast("Нужен файл изображения", "warn"); return; }
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      $("img-file").files = dt.files;
+      onImgFileSelected(file);
+    });
+    $("img-mask-btn").addEventListener("click", () => $("img-mask").click());
+    $("img-mask").addEventListener("change", () => {
+      const f = $("img-mask").files?.[0];
+      $("img-mask-name").textContent = f ? "📄 " + f.name : "";
+    });
+    $("img-prompt").addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); sendImages(); }
+    });
+
     async function bootstrap() {
+      setView("chat");
       try {
         await loadModels();
+        await loadImageModels();
       } catch (e) {
         showToast("Модели: " + humanizeClientError(e), "error");
       }
       try {
         await ensureSession();
-        await loadSession();
+        await loadSession(0, { syncModel: true, scrollToBottom: true });
       } catch (e) {
         showToast("Чат: " + humanizeClientError(e), "warn", 8000);
+        lastHistoryFingerprint = "";
         renderHistory([]);
       }
       try {
@@ -1941,6 +3219,8 @@
       } catch (e) {
         showToast("Список чатов: " + humanizeClientError(e), "warn");
       }
+      startLiveSync();
+      await loadBilling(true);
     }
 
     bootstrap();

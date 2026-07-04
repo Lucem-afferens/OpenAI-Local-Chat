@@ -1,0 +1,19 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY app.py store.py ./
+COPY static ./static
+
+RUN useradd --create-home --uid 1000 appuser \
+    && mkdir -p /app/data \
+    && chown -R appuser:appuser /app
+
+USER appuser
+
+EXPOSE 8765
+
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8765", "--workers", "1"]

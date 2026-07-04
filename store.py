@@ -11,6 +11,7 @@ from typing import Any
 
 DB_DIR = Path(__file__).resolve().parent / "data"
 DB_PATH = DB_DIR / "chat.sqlite"
+BILLING_PATH = DB_DIR / "billing.json"
 
 
 def _now() -> float:
@@ -236,6 +237,26 @@ def set_message_status(message_id: str, status: str) -> None:
         conn.execute("UPDATE messages SET status = ? WHERE id = ?", (status, message_id))
 
 
+def get_message_status(message_id: str) -> str | None:
+    with _connect() as conn:
+        row = conn.execute("SELECT status FROM messages WHERE id = ?", (message_id,)).fetchone()
+    return str(row["status"]) if row else None
+
+
+def cancel_assistant_message(message_id: str) -> bool:
+    ts = _now()
+    with _connect() as conn:
+        cur = conn.execute(
+            """
+            UPDATE messages
+            SET status = 'cancelled', content = ?, completed_at = ?, error_json = NULL, result_json = NULL
+            WHERE id = ? AND role = 'assistant' AND status IN ('pending', 'running')
+            """,
+            ("Запрос остановлен.", ts, message_id),
+        )
+    return cur.rowcount > 0
+
+
 def complete_assistant_message(message_id: str, *, reply: str, result: dict[str, Any]) -> None:
     ts = _now()
     with _connect() as conn:
@@ -243,7 +264,7 @@ def complete_assistant_message(message_id: str, *, reply: str, result: dict[str,
             """
             UPDATE messages
             SET status = 'completed', content = ?, result_json = ?, completed_at = ?, error_json = NULL
-            WHERE id = ?
+            WHERE id = ? AND status IN ('pending', 'running')
             """,
             (reply, json.dumps(result, ensure_ascii=False), ts, message_id),
         )
@@ -257,10 +278,22 @@ def fail_assistant_message(message_id: str, error: dict[str, Any]) -> None:
             """
             UPDATE messages
             SET status = 'failed', content = ?, error_json = ?, completed_at = ?
-            WHERE id = ?
+            WHERE id = ? AND status IN ('pending', 'running')
             """,
             (msg, json.dumps(error, ensure_ascii=False), ts, message_id),
         )
+
+
+def count_pending_jobs() -> int:
+    with _connect() as conn:
+        row = conn.execute(
+            """
+            SELECT COUNT(*) AS n
+            FROM messages
+            WHERE role = 'assistant' AND status IN ('pending', 'running')
+            """
+        ).fetchone()
+    return int(row["n"]) if row else 0
 
 
 def get_resumable_jobs() -> list[dict]:
@@ -307,3 +340,39 @@ def _message_row(row: sqlite3.Row) -> dict:
         "created_at": row["created_at"],
         "completed_at": row["completed_at"],
     }
+
+
+def get_billing_config() -> dict[str, Any]:
+    if not BILLING_PATH.exists():
+        return {}
+    try:
+        data = json.loads(BILLING_PATH.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def set_billing_credit(
+    credit_usd: float,
+    *,
+    baseline_spent_usd: float | None = None,
+    anchor_day_unix: int | None = None,
+) -> dict[str, Any]:
+    DB_DIR.mkdir(parents=True, exist_ok=True)
+    cfg: dict[str, Any] = {
+        "credit_usd": round(max(0.0, float(credit_usd)), 2),
+        "set_at_unix": _now(),
+    }
+    if anchor_day_unix is not None:
+        cfg["anchor_day_unix"] = int(anchor_day_unix)
+    if baseline_spent_usd is not None:
+        cfg["baseline_spent_usd"] = round(max(0.0, float(baseline_spent_usd)), 4)
+    BILLING_PATH.write_text(json.dumps(cfg, ensure_ascii=False), encoding="utf-8")
+    return cfg
+
+
+def patch_billing_config(updates: dict[str, Any]) -> dict[str, Any]:
+    cfg = get_billing_config()
+    cfg.update(updates)
+    BILLING_PATH.write_text(json.dumps(cfg, ensure_ascii=False), encoding="utf-8")
+    return cfg
