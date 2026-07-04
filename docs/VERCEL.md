@@ -16,11 +16,13 @@
 
 1. Форк / clone репозитория [Lucem-afferens/OpenAI-Local-Chat](https://github.com/Lucem-afferens/OpenAI-Local-Chat)
 2. [vercel.com](https://vercel.com) → **Add New Project** → Import репозитория
-3. Build settings (обычно подхватываются из `vercel.json`):
+3. **Framework Preset:** **Other** (не Next.js, не Vite, не FastAPI)
+4. **Build & Output** (или оставьте пустым — подхватится из `vercel.json`):
    - **Build Command:** `npm run vercel-build`
-   - **Output:** статика из `public/` + serverless `api/`
-4. **Environment Variables:** `OPENAI_API_KEY` **не нужен** на Vercel
-5. Deploy
+   - **Output Directory:** **пусто** (не `public`, не `dist`)
+   - **Install Command:** `npm install`
+5. **Environment Variables:** `OPENAI_API_KEY` **не добавлять**
+6. Deploy
 
 После деплоя откройте сайт → введите свой ключ в модальном окне или в **⚙ Настройки**.
 
@@ -55,12 +57,9 @@ uvicorn app:app --reload --host 127.0.0.1 --port 8765
 
 ```
 api/                  # Serverless proxy (Node.js)
+  _lib/               # общий код (префикс _ — не маршрут)
   config.js           # GET /api/config
-  models.js           # GET /api/models
-  chat.js             # POST /api/chat
-  image-models.js
-  images/generate.js
-  images/edit.js
+  ...
 public/               # генерируется vercel-build (не в git)
   index.html
   assets/runtime.js

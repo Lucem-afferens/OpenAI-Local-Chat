@@ -1,4 +1,4 @@
-const { sendJson } = require("../lib/vercel/http");
+const { sendJson } = require("./_lib/http");
 
 module.exports = (req, res) => {
   if (req.method && req.method !== "GET") {

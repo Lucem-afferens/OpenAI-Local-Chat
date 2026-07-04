@@ -1,7 +1,7 @@
 const Busboy = require("busboy");
-const { requireApiKey } = require("../../lib/vercel/auth");
-const { OPENAI_BASE } = require("../../lib/vercel/openai");
-const { sendJson, methodNotAllowed } = require("../../lib/vercel/http");
+const { requireApiKey } = require("../_lib/auth");
+const { OPENAI_BASE } = require("../_lib/openai");
+const { sendJson, methodNotAllowed } = require("../_lib/http");
 
 function parseMultipart(req) {
   return new Promise((resolve, reject) => {

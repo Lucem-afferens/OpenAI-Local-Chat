@@ -1,6 +1,6 @@
-const { requireApiKey } = require("../lib/vercel/auth");
-const { openaiFetch } = require("../lib/vercel/openai");
-const { sendJson, methodNotAllowed } = require("../lib/vercel/http");
+const { requireApiKey } = require("./_lib/auth");
+const { openaiFetch } = require("./_lib/openai");
+const { sendJson, methodNotAllowed } = require("./_lib/http");
 
 const FALLBACK_IMAGE_MODELS = [
   "gpt-image-2",

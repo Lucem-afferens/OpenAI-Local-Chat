@@ -1,6 +1,6 @@
-const { requireApiKey } = require("../lib/vercel/auth");
-const { executeChatWithRouting, httpError } = require("../lib/vercel/chat");
-const { sendJson, methodNotAllowed } = require("../lib/vercel/http");
+const { requireApiKey } = require("./_lib/auth");
+const { executeChatWithRouting, httpError } = require("./_lib/chat");
+const { sendJson, methodNotAllowed } = require("./_lib/http");
 
 module.exports = async (req, res) => {
   if (req.method !== "POST") {
