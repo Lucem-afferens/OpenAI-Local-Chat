@@ -104,7 +104,7 @@ uvicorn app:app --reload --host 127.0.0.1 --port 8765
 
 ### Веб на Vercel
 
-Import репозитория в [Vercel](https://vercel.com) — **`OPENAI_API_KEY` на сервере не нужен**. Каждый пользователь вводит свой ключ в UI; он хранится в **localStorage** браузера. Подробно: [docs/VERCEL.md](docs/VERCEL.md).
+Import репозитория в [Vercel](https://vercel.com) — preset **Other**, Output Directory **пустой**, без `OPENAI_API_KEY` на сервере. Подробно: [docs/VERCEL.md](docs/VERCEL.md).
 
 ### Первые шаги в UI
 

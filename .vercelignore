@@ -1,0 +1,13 @@
+# Локальный FastAPI — только для uvicorn, не для Vercel
+app.py
+store.py
+requirements.txt
+Dockerfile
+docker-compose.yml
+.venv
+venv
+data
+__pycache__
+*.pyc
+.env
+.env.*

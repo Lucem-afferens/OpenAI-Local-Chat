@@ -16,13 +16,26 @@
 
 1. Форк / clone репозитория [Lucem-afferens/OpenAI-Local-Chat](https://github.com/Lucem-afferens/OpenAI-Local-Chat)
 2. [vercel.com](https://vercel.com) → **Add New Project** → Import репозитория
-3. **Framework Preset:** **Other** (не Next.js, не Vite, не FastAPI)
-4. **Build & Output** (или оставьте пустым — подхватится из `vercel.json`):
-   - **Build Command:** `npm run vercel-build`
-   - **Output Directory:** **пусто** (не `public`, не `dist`)
-   - **Install Command:** `npm install`
+   - Если его нет в списке → **Adjust GitHub App Permissions** и дайте Vercel доступ к репо.
+3. **Framework Preset:** **Other** (не Next.js, не Vite, **не FastAPI / Python**)
+4. **Build & Output** (Settings → General → Build & Development Settings):
+
+| Поле | Значение |
+|------|----------|
+| Framework Preset | **Other** |
+| Root Directory | `./` |
+| Build Command | `npm run vercel-build` |
+| Output Directory | **пусто** (не `public`) |
+| Install Command | `npm install` |
+
 5. **Environment Variables:** `OPENAI_API_KEY` **не добавлять**
 6. Deploy
+
+### Ошибка «Application startup failed. Exiting.» на `/`
+
+Vercel пытается запустить **`app.py` (Python/FastAPI)** вместо статики + Node `/api`.  
+Исправление: preset **Other**, Output Directory **пустой**, redeploy.  
+В репозитории `.vercelignore` исключает Python-файлы из деплоя Vercel.
 
 После деплоя откройте сайт → введите свой ключ в модальном окне или в **⚙ Настройки**.
 
